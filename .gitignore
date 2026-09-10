@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Databases & Backups
+expenses.db
+expenses.txt.bak
+*.csv
+
+# Environment & IDE
+.env
+.vscode/
+.DS_Store
+Thumbs.db
