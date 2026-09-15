@@ -56,9 +56,32 @@ class AuthNotifier extends Notifier<AuthStatus> {
   @override
   AuthStatus build() => AuthStatus.unknown;
 
+  /// Decide the startup auth state.
+  ///
+  /// Having a token is not the same as having a *valid* one. Trusting mere
+  /// presence sent expired sessions to the dashboard, where they got a spinner
+  /// and then an error card. Ask the server instead; the JWT interceptor will
+  /// transparently refresh on the way through if the access token has aged out.
   Future<void> checkSession() async {
     final token = await getAccessToken();
-    state = token != null ? AuthStatus.authenticated : AuthStatus.unauthenticated;
+    if (token == null) {
+      state = AuthStatus.unauthenticated;
+      return;
+    }
+    try {
+      await ref.read(dioProvider).get('/auth/me');
+      state = AuthStatus.authenticated;
+    } on DioException catch (e) {
+      // Only a rejected identity means signed out. A network blip should not
+      // discard a session that may well still be good.
+      final code = e.response?.statusCode;
+      if (code == 401 || code == 403) {
+        await clearTokens();
+        state = AuthStatus.unauthenticated;
+      } else {
+        state = AuthStatus.authenticated;
+      }
+    }
   }
 
   Future<void> login({
@@ -84,12 +107,26 @@ final authProvider = NotifierProvider<AuthNotifier, AuthStatus>(
 // ═══════════════════════════════════════════════════════════════════════════
 
 class JwtInterceptor extends Interceptor {
-  JwtInterceptor(this._ref);
+  JwtInterceptor(this._ref, this._dio);
 
   final Ref _ref;
 
-  /// Flag to prevent infinite refresh loops.
-  bool _isRefreshing = false;
+  /// The client this interceptor is installed on. Held directly rather than
+  /// read back from dioProvider, which would be a circular dependency — and
+  /// holding it means the refresh and retry inherit the app's real transport
+  /// and timeouts instead of a bare, unconfigurable Dio().
+  final Dio _dio;
+
+  /// In-flight refresh, if any.
+  ///
+  /// The dashboard fires six requests at once, so an expired token produces
+  /// six simultaneous 401s. Previously the first one refreshed and the other
+  /// five were passed through as hard failures, surfacing a spurious error
+  /// screen. They now await the same refresh and retry once it lands.
+  Future<String?>? _refreshInFlight;
+
+  /// Marks a request that has already been retried after a refresh.
+  static const String _retriedKey = 'jwt_retried';
 
   @override
   Future<void> onRequest(
@@ -117,23 +154,57 @@ class JwtInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    // Only handle 401 Unauthorized
-    if (err.response?.statusCode != 401 || _isRefreshing) {
+    // Only handle 401 Unauthorized.
+    if (err.response?.statusCode != 401) {
       return handler.next(err);
     }
 
-    _isRefreshing = true;
+    // A refresh call that itself 401s must not recurse.
+    if (err.requestOptions.path.contains('/auth/refresh')) {
+      await _forceLogout();
+      return handler.next(err);
+    }
 
+    // Retry once and once only. Without this marker a request that 401s again
+    // after a successful refresh would trigger another refresh, and so on.
+    if (err.requestOptions.extra[_retriedKey] == true) {
+      return handler.next(err);
+    }
+
+    // Join the in-flight refresh, or start one.
+    final newAccess = await (_refreshInFlight ??= _refreshTokens());
+
+    if (newAccess == null) {
+      return handler.next(err);
+    }
+
+    try {
+      final retryOptions = err.requestOptions;
+      retryOptions.headers['Authorization'] = 'Bearer $newAccess';
+      retryOptions.extra = {...retryOptions.extra, _retriedKey: true};
+      // Reuse the app's Dio so the retry keeps the configured timeouts.
+      final retryResponse = await _dio.fetch(retryOptions);
+      return handler.resolve(retryResponse);
+    } on DioException catch (retryErr) {
+      return handler.next(retryErr);
+    }
+  }
+
+  /// Exchange the refresh token for a new pair. Returns the new access token,
+  /// or null when the session is genuinely over (the caller is logged out).
+  Future<String?> _refreshTokens() async {
     try {
       final refreshToken = await getRefreshToken();
       if (refreshToken == null) {
         await _forceLogout();
-        return handler.next(err);
+        return null;
       }
 
-      // Attempt token refresh using a *separate* Dio instance
-      // to avoid the interceptor catching its own 401.
-      final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
+      // Separate Dio so this request doesn't re-enter this interceptor, but
+      // sharing the app's transport and timeouts — a bare Dio() would ignore
+      // both, and would be impossible to point at a test double.
+      final refreshDio = Dio(_dio.options)
+        ..httpClientAdapter = _dio.httpClientAdapter;
       final response = await refreshDio.post(
         '/auth/refresh',
         data: {'refresh_token': refreshToken},
@@ -143,22 +214,16 @@ class JwtInterceptor extends Interceptor {
         final newAccess = response.data['access_token'] as String;
         final newRefresh = response.data['refresh_token'] as String;
         await saveTokens(accessToken: newAccess, refreshToken: newRefresh);
-
-        // Retry the original request with the new token
-        final retryOptions = err.requestOptions;
-        retryOptions.headers['Authorization'] = 'Bearer $newAccess';
-
-        final retryResponse = await Dio().fetch(retryOptions);
-        return handler.resolve(retryResponse);
-      } else {
-        await _forceLogout();
-        return handler.next(err);
+        return newAccess;
       }
+      await _forceLogout();
+      return null;
     } on DioException {
       await _forceLogout();
-      return handler.next(err);
+      return null;
     } finally {
-      _isRefreshing = false;
+      // Clear the slot so a later expiry starts a fresh refresh.
+      _refreshInFlight = null;
     }
   }
 
@@ -186,7 +251,7 @@ final dioProvider = Provider<Dio>((ref) {
   );
 
   dio.interceptors.addAll([
-    JwtInterceptor(ref),
+    JwtInterceptor(ref, dio),
     if (kDebugMode)
       LogInterceptor(
         requestBody: true,
