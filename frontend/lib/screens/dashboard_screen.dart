@@ -11,6 +11,7 @@ import '../core/theme.dart';
 import '../models/dashboard_summary.dart';
 import '../providers/dashboard_providers.dart';
 import '../widgets/add_transaction_sheet.dart';
+import '../widgets/budget_card.dart';
 import '../widgets/credit_card_alarms_list.dart';
 import '../widgets/debt_card.dart';
 import '../widgets/hero_balance_section.dart';
@@ -217,7 +218,18 @@ class DashboardScreen extends ConsumerWidget {
 
         const SizedBox(height: AppSpacing.lg),
 
-        // 5. Standing monthly income (set up / next deposit)
+        // 5. Monthly budget progress
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          child: const BudgetCard()
+              .animate()
+              .fadeIn(duration: 600.ms, delay: 230.ms, curve: Curves.easeOut)
+              .slideY(begin: 0.08, end: 0, duration: 600.ms, curve: Curves.easeOutCubic),
+        ),
+
+        const SizedBox(height: AppSpacing.lg),
+
+        // 6. Standing monthly income (set up / next deposit)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: MonthlyIncomeCard(accounts: summary.accounts)
@@ -228,7 +240,7 @@ class DashboardScreen extends ConsumerWidget {
 
         if (summary.recentTransactions.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
-          // 6. Recent Ledger Activity
+          // 7. Recent Ledger Activity
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             child: RecentActivityCard(

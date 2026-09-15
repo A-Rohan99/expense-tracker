@@ -9,6 +9,7 @@ import '../models/credit_card.dart';
 import '../models/dashboard_summary.dart';
 import '../models/loan.dart';
 import '../models/transaction.dart';
+import 'budget_providers.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Household Mode Toggle Notifier (Riverpod 3.x)
@@ -137,12 +138,13 @@ final dashboardSummaryProvider = FutureProvider<DashboardSummary>((ref) async {
   final loansFuture = ref.watch(loansProvider.future);
   final monthlyTxFuture = ref.watch(monthlyTransactionsProvider.future);
   final recentTxFuture = ref.watch(recentTransactionsProvider.future);
+  final reportFuture = ref.watch(monthlyReportProvider.future);
 
   final accounts = await accountsFuture;
   final creditCards = await creditCardsFuture;
   final creditCardSummaries = await creditCardSummariesFuture;
   final loans = await loansFuture;
-  final monthlyTx = await monthlyTxFuture;
+  await monthlyTxFuture;
   final recentTx = await recentTxFuture;
 
   // 1. Total Liquid Balance (Bank / Cash / Wallet active accounts)
@@ -150,19 +152,16 @@ final dashboardSummaryProvider = FutureProvider<DashboardSummary>((ref) async {
       .where((a) => a.isActive)
       .fold<double>(0.0, (sum, a) => sum + a.currentBalance);
 
-  // 2. Monthly cash flow
-  var incomeThisMonth = 0.0;
-  var expenseThisMonth = 0.0;
-
-  for (final tx in monthlyTx) {
-    if (tx.transactionType == TransactionType.income) {
-      incomeThisMonth += tx.amount;
-    } else if (tx.transactionType == TransactionType.expense) {
-      expenseThisMonth += tx.amount;
-    }
-  }
-
-  final netIncomeThisMonth = incomeThisMonth - expenseThisMonth;
+  // 2. Monthly cash flow, aggregated by the server.
+  //
+  // This used to sum `monthlyTx` here, but that list is capped at 100 rows, so
+  // once a month had more transactions than the cap the headline figures were
+  // silently wrong — and the error grew with use. /reports/monthly counts
+  // everything.
+  final report = await reportFuture;
+  final incomeThisMonth = report.income;
+  final expenseThisMonth = report.expense;
+  final netIncomeThisMonth = report.net;
 
   // 3. Liabilities / Debt
   final creditCardDebt = creditCardSummaries.fold<double>(
