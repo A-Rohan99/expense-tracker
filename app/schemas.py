@@ -497,3 +497,75 @@ class RecurringIncomeRead(BaseModel):
     next_due_date: date | None = None
     account_name: str | None = None
     posted_this_run: int = 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BUDGETS
+# ═══════════════════════════════════════════════════════════════════════════
+
+class BudgetCreate(BaseModel):
+    """``category`` omitted or null means an overall cap on all spending."""
+    amount: PositiveAmount
+    category: str | None = Field(None, min_length=1, max_length=60)
+    currency: Currency = Currency.INR
+    include_household: bool = False
+
+
+class BudgetUpdate(BaseModel):
+    amount: PositiveAmount | None = None
+    include_household: bool | None = None
+    is_active: bool | None = None
+
+
+class BudgetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    category: str | None = None
+    amount: Decimal
+    currency: str
+    include_household: bool
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    # Derived from the ledger for the month in question — never stored.
+    spent: Decimal = Decimal("0.00")
+    remaining: Decimal = Decimal("0.00")
+    percent_used: Decimal = Decimal("0.00")
+    period: str = ""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# REPORTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+class CategoryBreakdownRow(BaseModel):
+    category: str
+    amount: Decimal
+    percent: Decimal
+    transaction_count: int
+
+
+class MonthlyTotals(BaseModel):
+    period: str                 # YYYY-MM
+    income: Decimal
+    expense: Decimal
+    net: Decimal
+
+
+class MonthlyReport(BaseModel):
+    """
+    Spending for one month, aggregated server-side.
+
+    The client used to sum this itself from a capped list of transactions, so
+    a month with more rows than the cap produced silently wrong totals.
+    """
+    period: str
+    income: Decimal
+    expense: Decimal
+    net: Decimal
+    transaction_count: int
+    by_category: list[CategoryBreakdownRow]
+    trend: list[MonthlyTotals]

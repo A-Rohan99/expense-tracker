@@ -143,6 +143,10 @@ class User(Base):
     loans: Mapped[list["Loan"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan",
     )
+    budgets: Mapped[list["Budget"]] = relationship(
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
     recurring_income: Mapped["RecurringIncome | None"] = relationship(
         back_populates="owner",
         cascade="all, delete-orphan",
@@ -548,3 +552,67 @@ class RecurringIncome(Base):
             f"<RecurringIncome {self.amount} on day {self.day_of_month} "
             f"last={self.last_posted_period}>"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BUDGET  (monthly spending cap, overall or per category)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class Budget(Base):
+    """
+    A monthly spending cap.
+
+    ``category`` NULL means an overall budget for everything; a value scopes
+    the cap to that category. One of each per user, enforced by the unique
+    constraint — "two different limits for Groceries" has no sensible meaning.
+
+    Spend is never stored. It is summed from the ledger for the month being
+    asked about, the same way credit-card outstanding is derived, so a budget
+    can never drift out of step with the transactions behind it.
+    """
+    __tablename__ = "budgets"
+
+    id: Mapped[str] = mapped_column(
+        String(32), primary_key=True, default=_uuid,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # NULL = the overall budget for all spending.
+    category: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="INR",
+    )
+    # Whether household-shared spending counts toward this cap.
+    include_household: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_budget_amount_positive"),
+        # NULLs compare unequal in SQL, so this constrains the per-category
+        # rows; the overall budget is additionally guarded in the router.
+        UniqueConstraint("user_id", "category", name="uq_budget_user_category"),
+    )
+
+    owner: Mapped["User"] = relationship(back_populates="budgets")
+
+    def __repr__(self) -> str:
+        scope = self.category or "overall"
+        return f"<Budget {scope} {self.amount}>"

@@ -36,10 +36,12 @@ import app.models  # noqa: F401
 from app.routers import (
     accounts,
     auth,
+    budgets,
     credit_cards,
     households,
     loans,
     recurring_income,
+    reports,
     transactions,
 )
 from app.schemas import EMICalculationRequest, EMICalculationResponse
@@ -126,6 +128,8 @@ app.include_router(loans.router,        prefix=API_V1)
 app.include_router(transactions.router, prefix=API_V1)
 app.include_router(households.router,   prefix=API_V1)
 app.include_router(recurring_income.router, prefix=API_V1)
+app.include_router(budgets.router,      prefix=API_V1)
+app.include_router(reports.router,      prefix=API_V1)
 
 
 # ---------------------------------------------------------------------------

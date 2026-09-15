@@ -13,8 +13,9 @@ import logging
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_active_user
@@ -41,10 +42,25 @@ logger = logging.getLogger("app.transactions")
 def list_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    transaction_type: str | None = Query(None, description="Filter: income|expense|transfer"),
-    category: str | None = Query(None),
+    transaction_type: TransactionType | None = Query(
+        None, description="income | expense | transfer"
+    ),
+    category: str | None = Query(None, description="Exact category match"),
+    search: str | None = Query(
+        None, min_length=1, max_length=120,
+        description="Case-insensitive match on description or category",
+    ),
+    account_id: str | None = Query(None),
+    credit_card_id: str | None = Query(None),
+    loan_id: str | None = Query(None),
+    min_amount: Decimal | None = Query(None, ge=0),
+    max_amount: Decimal | None = Query(None, ge=0),
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
+    sort: str = Query(
+        "date_desc",
+        description="date_desc | date_asc | amount_desc | amount_asc",
+    ),
     include_household: bool = Query(False, description="Include shared household transactions"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_active_user),
@@ -80,7 +96,9 @@ def list_transactions(
 
     # ── Optional filters ───────────────────────────────────────────────
     if transaction_type:
-        query = query.filter(Transaction.transaction_type == transaction_type)
+        query = query.filter(
+            Transaction.transaction_type == transaction_type.value
+        )
     if category:
         query = query.filter(Transaction.category == category)
     if start_date:
@@ -88,9 +106,51 @@ def list_transactions(
     if end_date:
         query = query.filter(Transaction.transaction_date <= end_date)
 
+    # Instrument filters — "everything on this card".
+    if account_id:
+        query = query.filter(Transaction.account_id == account_id)
+    if credit_card_id:
+        query = query.filter(Transaction.credit_card_id == credit_card_id)
+    if loan_id:
+        query = query.filter(Transaction.loan_id == loan_id)
+
+    if min_amount is not None:
+        query = query.filter(Transaction.amount >= min_amount)
+    if max_amount is not None:
+        query = query.filter(Transaction.amount <= max_amount)
+
+    if search:
+        # Category is free text, so searching it alongside the description is
+        # what people expect from one search box.
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Transaction.description.ilike(pattern),
+                Transaction.category.ilike(pattern),
+            )
+        )
+
+    orderings = {
+        "date_desc": (
+            Transaction.transaction_date.desc(),
+            Transaction.created_at.desc(),
+        ),
+        "date_asc": (
+            Transaction.transaction_date.asc(),
+            Transaction.created_at.asc(),
+        ),
+        "amount_desc": (Transaction.amount.desc(),),
+        "amount_asc": (Transaction.amount.asc(),),
+    }
+    if sort not in orderings:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"sort must be one of: {', '.join(orderings)}",
+        )
+
     return (
         query
-        .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+        .order_by(*orderings[sort])
         .offset(skip)
         .limit(limit)
         .all()
