@@ -17,6 +17,7 @@ import '../models/loan.dart';
 import '../providers/dashboard_providers.dart';
 import '../providers/manage_providers.dart';
 import '../utils/currency_formatter.dart';
+import '../widgets/household_card.dart';
 import '../widgets/instrument_form_sheet.dart';
 
 class ManageScreen extends ConsumerWidget {
@@ -110,6 +111,8 @@ class ManageScreen extends ConsumerWidget {
                     CurrencyFormatter.format(l.outstandingBalance),
                 iconOf: (_) => Icons.account_balance_outlined,
               ),
+              const SizedBox(height: AppSpacing.lg),
+              const HouseholdCard(),
               const SizedBox(height: AppSpacing.xl),
               const _SignOutButton(),
             ],

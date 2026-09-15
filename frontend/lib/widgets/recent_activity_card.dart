@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/theme.dart';
 import '../models/transaction.dart';
@@ -48,11 +49,22 @@ class RecentActivityCard extends StatelessWidget {
                   ),
                 ],
               ),
-              Text(
-                'LATEST LEDGER',
-                style: AppTypography.labelSmall.copyWith(
-                  color: AppColors.textDisabled,
-                  fontSize: 10,
+              // The card shows only the five most recent rows, so it needs a
+              // way through to the full, searchable history.
+              TextButton(
+                onPressed: () => context.push('/transactions'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                ),
+                child: Text(
+                  'See all',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.neonCyan,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

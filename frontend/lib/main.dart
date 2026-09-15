@@ -15,6 +15,7 @@ import 'core/theme.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/manage_screen.dart';
+import 'screens/transactions_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Splash screen (shown while the persisted session is checked)
@@ -102,6 +103,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/manage',
         builder: (context, state) => const ManageScreen(),
       ),
+      GoRoute(
+        path: '/transactions',
+        builder: (context, state) => const TransactionsScreen(),
+      ),
     ],
   );
 });
@@ -130,8 +135,28 @@ class ExpenseTrackerApp extends ConsumerWidget {
 // main()
 // ═══════════════════════════════════════════════════════════════════════════
 
+/// Declare the bundled fonts on the app's licences page.
+///
+/// Space Grotesk and Inter are both SIL OFL 1.1, which requires the licence
+/// to be distributed with the font. `google_fonts` used to do this for us;
+/// now that the files are in `assets/fonts/`, we do it ourselves.
+void _registerFontLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    for (final entry in const {
+      'SpaceGrotesk': 'assets/fonts/SpaceGrotesk-OFL.txt',
+      'Inter': 'assets/fonts/Inter-OFL.txt',
+    }.entries) {
+      yield LicenseEntryWithLineBreaks(
+        [entry.key],
+        await rootBundle.loadString(entry.value),
+      );
+    }
+  });
+}
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  _registerFontLicenses();
 
   // Lock to portrait + set system UI overlay
   SystemChrome.setPreferredOrientations([

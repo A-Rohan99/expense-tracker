@@ -1,5 +1,5 @@
 name: expense_tracker_app
-description: "A new Flutter project."
+description: "Track family spending, credit card bills and loan EMIs."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -38,7 +38,6 @@ dependencies:
   dio: ^5.11.1
   flutter_animate: ^4.5.2
   go_router: ^18.0.1
-  google_fonts: ^8.2.1
   flutter_secure_storage: ^11.1.0
 
 dev_dependencies:
@@ -62,6 +61,39 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Bundled rather than fetched from fonts.gstatic.com at runtime: the app
+  # rendered in a system fallback until the download landed, and a first launch
+  # on a poor connection showed the wrong typeface entirely. Subset to Latin
+  # plus the symbols the UI uses, which cut these from 1.5 MB to ~300 KB.
+  fonts:
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-400.ttf
+          weight: 400
+        - asset: assets/fonts/SpaceGrotesk-500.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-600.ttf
+          weight: 600
+        - asset: assets/fonts/SpaceGrotesk-700.ttf
+          weight: 700
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-400.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-700.ttf
+          weight: 700
+
+  # Both families are SIL OFL 1.1, which requires the licence to travel with
+  # the fonts. main.dart registers these with LicenseRegistry so they show up
+  # on the app's own licences page.
+  assets:
+    - assets/fonts/SpaceGrotesk-OFL.txt
+    - assets/fonts/Inter-OFL.txt
 
   # To add assets to your application, add an assets section, like this:
   # assets:

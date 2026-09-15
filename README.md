@@ -65,7 +65,7 @@ docker compose up --build
 app/                 FastAPI backend
   main.py            app factory, middleware, health checks
   config.py          all settings; fails closed on anything production needs
-  models.py          SQLAlchemy models — 7 tables
+  models.py          SQLAlchemy models — 8 tables
   schemas.py         Pydantic request/response shapes
   money.py           Decimal helpers; money never touches float
   auth.py            JWT, password hashing, token versioning
@@ -110,8 +110,8 @@ write on restart.
 ## Tests
 
 ```bash
-pytest                    # backend, 107 tests
-cd frontend && flutter test   # client, 50 tests
+pytest                        # backend, 139 tests
+cd frontend && flutter test   # client, 79 tests
 ```
 
 The backend suite runs on SQLite for speed. CI runs it against Postgres as
@@ -181,3 +181,7 @@ alembic upgrade head
   are computed from the ledger on read, never stored, so they cannot drift.
 - **Every error carries a `request_id`**, echoed as `X-Request-ID`, which ties
   a user's report to the exact server log line.
+- **Fonts are bundled, not fetched.** Space Grotesk and Inter live in
+  `frontend/assets/fonts/`, subset to the characters the UI actually uses
+  (1.5 MB → 302 KB). Nothing is requested from fonts.gstatic.com, so the
+  installed app looks the same offline.

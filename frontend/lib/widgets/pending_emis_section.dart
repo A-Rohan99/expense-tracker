@@ -165,11 +165,16 @@ class _EmiTickCardState extends ConsumerState<_EmiTickCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
+              // Expanded: the name is user-supplied and sits beside a
+              // fixed-width badge, so without it a long one overflows.
+              Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.loan.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTypography.headlineSmall.copyWith(
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
@@ -185,6 +190,8 @@ class _EmiTickCardState extends ConsumerState<_EmiTickCard> {
                   ),
                 ],
               ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(

@@ -381,7 +381,11 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
       runSpacing: AppSpacing.sm,
       children: categories.map((c) {
         final isSelected = selected.toLowerCase() == c.toLowerCase();
-        return GestureDetector(
+        return Semantics(
+          button: true,
+          selected: isSelected,
+          label: '$c category',
+          child: GestureDetector(
           onTap: () {
             setState(() {
               _categoryController.text = isSelected ? '' : c;
@@ -389,10 +393,9 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
           },
           child: AnimatedContainer(
             duration: 180.ms,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
+            // 44dp minimum so the chip is a reachable tap target.
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             decoration: BoxDecoration(
               color: isSelected
                   ? accent.withValues(alpha: 0.14)
@@ -404,13 +407,24 @@ class _AddTransactionSheetState extends ConsumerState<AddTransactionSheet> {
                     : AppColors.subtleBorder,
               ),
             ),
-            child: Text(
-              c,
-              style: AppTypography.labelMedium.copyWith(
-                color: isSelected ? accent : AppColors.textSecondary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              ),
+            // A Container with `alignment` set and a bounded maxWidth
+            // stretches to that width, so every chip filled the row and the
+            // Wrap never wrapped. A min-width Row shrinks to the label while
+            // still centring it in the 44dp target.
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  c,
+                  style: AppTypography.labelMedium.copyWith(
+                    color: isSelected ? accent : AppColors.textSecondary,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
+          ),
           ),
         );
       }).toList(),

@@ -113,7 +113,10 @@ class _PayBillBottomSheetState extends ConsumerState<PayBillBottomSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
+                    // Expanded: the name is user-supplied and sits beside a
+                    // fixed-width chip.
+                    Expanded(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -127,12 +130,16 @@ class _PayBillBottomSheetState extends ConsumerState<PayBillBottomSheet> {
                         const SizedBox(height: 2),
                         Text(
                           widget.card.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTypography.headlineSmall.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                     ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
                     if (widget.card.lastFour != null)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

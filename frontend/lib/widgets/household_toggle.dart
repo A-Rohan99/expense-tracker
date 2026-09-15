@@ -10,10 +10,16 @@ class HouseholdToggle extends StatelessWidget {
     super.key,
     required this.isHousehold,
     required this.onChanged,
+    this.expanded = false,
   });
 
   final bool isHousehold;
   final ValueChanged<bool> onChanged;
+
+  /// Let the two options share the full available width instead of hugging
+  /// their labels. Used when the toggle gets a row of its own on a narrow
+  /// screen, where hugging would strand it against one edge.
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -25,24 +31,26 @@ class HouseholdToggle extends StatelessWidget {
         border: Border.all(color: AppColors.subtleBorder),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          _buildOption(
+          _fit(_buildOption(
             title: 'PRIVATE',
             icon: Icons.lock_outline_rounded,
             isSelected: !isHousehold,
             onTap: () => onChanged(false),
-          ),
-          _buildOption(
+          )),
+          _fit(_buildOption(
             title: 'HOUSEHOLD',
             icon: Icons.groups_outlined,
             isSelected: isHousehold,
             onTap: () => onChanged(true),
-          ),
+          )),
         ],
       ),
     );
   }
+
+  Widget _fit(Widget option) => expanded ? Expanded(child: option) : option;
 
   Widget _buildOption({
     required String title,
@@ -50,12 +58,29 @@ class HouseholdToggle extends StatelessWidget {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    // Semantics: colour alone conveyed which mode was active, so a screen
+    // reader announced two identical unlabelled bits of text. minHeight 44
+    // brings the tap target up to the accessible minimum — it was ~30dp.
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      // The visible label is display-uppercase; spell it normally for a
+      // screen reader rather than having it read out letter by letter.
+      label: '${title.toLowerCase()} view',
+      // Without this the inner Text's own label merges in and the control
+      // announces twice. It also drops the GestureDetector's tap action,
+      // so re-declare it here or the control is unusable with a screen
+      // reader — visible but not activatable.
+      excludeSemantics: true,
+      onTap: onTap,
+      child: GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
+        constraints: const BoxConstraints(minHeight: 44),
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.charcoal : Colors.transparent,
@@ -93,6 +118,7 @@ class HouseholdToggle extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

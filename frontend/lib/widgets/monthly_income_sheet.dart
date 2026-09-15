@@ -373,12 +373,22 @@ class _MonthlyIncomeSheetState extends ConsumerState<MonthlyIncomeSheet> {
           runSpacing: 6,
           children: List.generate(31, (i) => i + 1).map((day) {
             final isSelected = day == _dayOfMonth;
-            return GestureDetector(
+            return Semantics(
+              button: true,
+              selected: isSelected,
+              label: 'Day $day of the month',
+              // The bare number would otherwise merge into the label.
+              // excludeSemantics also drops the tap action, so declare it.
+              excludeSemantics: true,
+              onTap: () => setState(() => _dayOfMonth = day),
+              child: GestureDetector(
               onTap: () => setState(() => _dayOfMonth = day),
               child: AnimatedContainer(
                 duration: 150.ms,
-                width: 38,
-                height: 34,
+                // 44dp square: the cells were 38x34, under the accessible
+                // minimum and fiddly on a phone.
+                width: 44,
+                height: 44,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: isSelected
@@ -401,6 +411,7 @@ class _MonthlyIncomeSheetState extends ConsumerState<MonthlyIncomeSheet> {
                         isSelected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
+              ),
               ),
             );
           }).toList(),

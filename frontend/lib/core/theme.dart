@@ -4,12 +4,13 @@
 /// - Backgrounds: True black (#000000), obsidian (#121212)
 /// - Surfaces: Charcoal (#1E1E1E) with 5% white border
 /// - Accents: Neon Green (#00FF66), Neon Pink (#FF0055), Neon Cyan (#00E5FF)
-/// - Typography: Space Grotesk (headings), Inter (body)
+/// - Typography: Space Grotesk (headings), Inter (body) — both bundled as
+///   assets, so the app never renders in a fallback face while a webfont
+///   downloads.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Color Palette
@@ -139,83 +140,95 @@ class AppTypography {
   AppTypography._();
 
   // ── Space Grotesk — geometric, modern headings ──────────────────────
-  static TextStyle get displayLarge => GoogleFonts.spaceGrotesk(
+  static TextStyle get displayLarge => const TextStyle(
+    fontFamily: 'SpaceGrotesk',
     fontSize: 40,
     fontWeight: FontWeight.w700,
     letterSpacing: -1.5,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get displayMedium => GoogleFonts.spaceGrotesk(
+  static TextStyle get displayMedium => const TextStyle(
+    fontFamily: 'SpaceGrotesk',
     fontSize: 32,
     fontWeight: FontWeight.w700,
     letterSpacing: -1.0,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get displaySmall => GoogleFonts.spaceGrotesk(
+  static TextStyle get displaySmall => const TextStyle(
+    fontFamily: 'SpaceGrotesk',
     fontSize: 28,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.5,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get headlineLarge => GoogleFonts.spaceGrotesk(
+  static TextStyle get headlineLarge => const TextStyle(
+    fontFamily: 'SpaceGrotesk',
     fontSize: 24,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.25,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get headlineMedium => GoogleFonts.spaceGrotesk(
+  static TextStyle get headlineMedium => const TextStyle(
+    fontFamily: 'SpaceGrotesk',
     fontSize: 20,
     fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get headlineSmall => GoogleFonts.spaceGrotesk(
+  static TextStyle get headlineSmall => const TextStyle(
+    fontFamily: 'SpaceGrotesk',
     fontSize: 18,
     fontWeight: FontWeight.w500,
     color: AppColors.textPrimary,
   );
 
   // ── Inter — clean, legible body text ────────────────────────────────
-  static TextStyle get bodyLarge => GoogleFonts.inter(
+  static TextStyle get bodyLarge => const TextStyle(
+    fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
-  static TextStyle get bodyMedium => GoogleFonts.inter(
+  static TextStyle get bodyMedium => const TextStyle(
+    fontFamily: 'Inter',
     fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
     height: 1.5,
   );
 
-  static TextStyle get bodySmall => GoogleFonts.inter(
+  static TextStyle get bodySmall => const TextStyle(
+    fontFamily: 'Inter',
     fontSize: 12,
     fontWeight: FontWeight.w400,
     color: AppColors.textTertiary,
     height: 1.4,
   );
 
-  static TextStyle get labelLarge => GoogleFonts.inter(
+  static TextStyle get labelLarge => const TextStyle(
+    fontFamily: 'Inter',
     fontSize: 14,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.5,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get labelMedium => GoogleFonts.inter(
+  static TextStyle get labelMedium => const TextStyle(
+    fontFamily: 'Inter',
     fontSize: 12,
     fontWeight: FontWeight.w500,
     letterSpacing: 0.5,
     color: AppColors.textSecondary,
   );
 
-  static TextStyle get labelSmall => GoogleFonts.inter(
+  static TextStyle get labelSmall => const TextStyle(
+    fontFamily: 'Inter',
     fontSize: 11,
     fontWeight: FontWeight.w500,
     letterSpacing: 0.5,
@@ -224,7 +237,8 @@ class AppTypography {
 
   // ── Monospace — for currency amounts ────────────────────────────────
   static TextStyle amountLarge({Color color = AppColors.textPrimary}) =>
-      GoogleFonts.spaceGrotesk(
+      TextStyle(
+        fontFamily: 'SpaceGrotesk',
         fontSize: 32,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
@@ -232,14 +246,16 @@ class AppTypography {
       );
 
   static TextStyle amountMedium({Color color = AppColors.textPrimary}) =>
-      GoogleFonts.spaceGrotesk(
+      TextStyle(
+        fontFamily: 'SpaceGrotesk',
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: color,
       );
 
   static TextStyle amountSmall({Color color = AppColors.textSecondary}) =>
-      GoogleFonts.spaceGrotesk(
+      TextStyle(
+        fontFamily: 'SpaceGrotesk',
         fontSize: 14,
         fontWeight: FontWeight.w500,
         color: color,

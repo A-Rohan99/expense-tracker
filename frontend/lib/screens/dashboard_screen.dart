@@ -45,10 +45,14 @@ class DashboardScreen extends ConsumerWidget {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.md,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+              // Title, toggle and Manage together need ~420dp. Below that
+              // they overflowed the row, so the toggle drops to a line of
+              // its own and stretches across it.
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 420;
+
+                  final title = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -68,25 +72,49 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                       ),
                     ],
-                  ),
+                  );
+
                   // Private vs Household Switch
-                  Row(
+                  final toggle = HouseholdToggle(
+                    isHousehold: isHousehold,
+                    expanded: isNarrow,
+                    onChanged: (val) {
+                      ref.read(householdModeProvider.notifier).setMode(val);
+                    },
+                  );
+
+                  final manageButton = IconButton(
+                    icon: const Icon(Icons.tune_rounded, size: 20),
+                    color: AppColors.textTertiary,
+                    tooltip: 'Manage accounts, cards and loans',
+                    onPressed: () => context.push('/manage'),
+                  );
+
+                  if (!isNarrow) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        title,
+                        Row(children: [toggle, manageButton]),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      HouseholdToggle(
-                        isHousehold: isHousehold,
-                        onChanged: (val) {
-                          ref.read(householdModeProvider.notifier).setMode(val);
-                        },
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(child: title),
+                          manageButton,
+                        ],
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.tune_rounded, size: 20),
-                        color: AppColors.textTertiary,
-                        tooltip: 'Manage accounts, cards and loans',
-                        onPressed: () => context.push('/manage'),
-                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      toggle,
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
 

@@ -199,7 +199,8 @@ class _CreditCardAlarmItem extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              Expanded(
+                child: Row(
                 children: [
                   Container(
                     width: 30,
@@ -214,11 +215,16 @@ class _CreditCardAlarmItem extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Column(
+                  // Expanded: the card sits at a fixed width and the name is
+                  // user-supplied, so a long one would overflow the row.
+                  Expanded(
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         card.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTypography.bodyMedium.copyWith(
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
@@ -234,8 +240,11 @@ class _CreditCardAlarmItem extends StatelessWidget {
                         ),
                     ],
                   ),
+                  ),
                 ],
               ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               _buildAlarmBadge(),
             ],
           ),
