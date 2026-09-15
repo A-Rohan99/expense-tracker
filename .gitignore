@@ -9,7 +9,13 @@ venv/
 env/
 
 # Databases & Backups
-expenses.db
+# Catch-all: no SQLite file should ever be committed, including the WAL
+# sidecars and any throwaway schema scratch files.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 expenses.txt.bak
 *.csv
 
