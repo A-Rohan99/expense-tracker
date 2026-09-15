@@ -1,11 +1,22 @@
-streamlit>=1.37
-pandas>=2.0
+# Runtime dependencies for the FastAPI backend.
+#
+# Pinned to exact versions so two builds of the same commit install the same
+# code. Floating >= constraints already bit once: bcrypt resolved from 4.x to
+# 5.0, whose stricter 72-byte limit turned long passwords into 500s.
+#
+# The retired Streamlit app's dependencies (streamlit, pandas) are deliberately
+# absent — they added a large needless surface to the API image.
 
-# --- FastAPI backend ---
-fastapi>=0.115
-uvicorn[standard]>=0.30
-sqlalchemy>=2.0
-pydantic[email]>=2.8
-python-jose[cryptography]>=3.3
-bcrypt>=4.1
-python-multipart>=0.0.9
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+sqlalchemy==2.0.53
+alembic==1.20.0
+pydantic[email]==2.13.5
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
+python-multipart==0.0.32
+python-dotenv==1.2.3
+
+# Postgres driver. Not needed for local SQLite development, but installed
+# everywhere so the production path is exercised by the same image.
+psycopg[binary]==3.3.5

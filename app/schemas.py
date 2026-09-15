@@ -49,6 +49,18 @@ class TransactionType(str, Enum):
     transfer = "transfer"
 
 
+class Currency(str, Enum):
+    """
+    Currencies the app supports.
+
+    Was a free-form 3-character string, so "XXX" and "123" both validated —
+    and since the UI formats everything as ₹ with Indian digit grouping,
+    anything but INR would have displayed as rupees regardless. Add codes here
+    only alongside real multi-currency support in the client.
+    """
+    INR = "INR"
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Shared field types (DRY)
 # ═══════════════════════════════════════════════════════════════════════════
@@ -138,7 +150,7 @@ class AccountCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     account_type: AccountType = AccountType.bank
     current_balance: NonNegativeAmount = Decimal("0.00")
-    currency: str = Field(default="INR", min_length=3, max_length=3)
+    currency: Currency = Currency.INR
 
 
 class AccountRead(BaseModel):
@@ -158,7 +170,7 @@ class AccountUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=120)
     account_type: AccountType | None = None
     current_balance: NonNegativeAmount | None = None
-    currency: str | None = Field(None, min_length=3, max_length=3)
+    currency: Currency | None = None
     is_active: bool | None = None
 
 
@@ -172,7 +184,7 @@ class CreditCardCreate(BaseModel):
     total_limit: PositiveAmount
     statement_day: DayOfMonth
     due_day: DayOfMonth
-    currency: str = Field(default="INR", min_length=3, max_length=3)
+    currency: Currency = Currency.INR
 
 
 class CreditCardRead(BaseModel):
@@ -202,7 +214,7 @@ class CreditCardUpdate(BaseModel):
     total_limit: PositiveAmount | None = None
     statement_day: DayOfMonth | None = None
     due_day: DayOfMonth | None = None
-    currency: str | None = Field(None, min_length=3, max_length=3)
+    currency: Currency | None = None
     is_active: bool | None = None
 
 
@@ -218,7 +230,7 @@ class LoanCreate(BaseModel):
     tenure_months: int = Field(gt=0, le=600)
     outstanding_balance: PositiveAmount
     start_date: date
-    currency: str = Field(default="INR", min_length=3, max_length=3)
+    currency: Currency = Currency.INR
 
 
 class LoanRead(BaseModel):
@@ -248,7 +260,7 @@ class LoanUpdate(BaseModel):
     loan_type: LoanType | None = None
     interest_rate: Annotated[Decimal, Field(ge=0, max_digits=5, decimal_places=2)] | None = None
     outstanding_balance: NonNegativeAmount | None = None
-    currency: str | None = Field(None, min_length=3, max_length=3)
+    currency: Currency | None = None
     is_active: bool | None = None
 
 
@@ -259,7 +271,7 @@ class LoanUpdate(BaseModel):
 class TransactionCreate(BaseModel):
     transaction_type: TransactionType
     amount: PositiveAmount
-    currency: str = Field(default="INR", min_length=3, max_length=3)
+    currency: Currency = Currency.INR
     transaction_date: date = Field(default_factory=date.today)
     category: str = Field(min_length=1, max_length=60)
     description: str | None = Field(None, max_length=500)
@@ -450,7 +462,7 @@ class RecurringIncomeCreate(BaseModel):
     day_of_month: int = Field(ge=1, le=31)
     name: str = Field("Monthly income", min_length=1, max_length=120)
     category: str = Field("Salary", min_length=1, max_length=60)
-    currency: str = Field("INR", min_length=3, max_length=3)
+    currency: Currency = Currency.INR
     is_household_shared: bool = False
 
 

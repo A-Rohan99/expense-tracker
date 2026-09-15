@@ -57,6 +57,13 @@ if IS_PRODUCTION:
 else:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./expense_tracker.db")
 
+# Connection pool (Postgres only — SQLite has no meaningful pool).
+DB_POOL_SIZE: int = _int_env("DB_POOL_SIZE", 5)
+DB_MAX_OVERFLOW: int = _int_env("DB_MAX_OVERFLOW", 10)
+# Recycle connections before a proxy or cloud database drops them as idle.
+DB_POOL_RECYCLE_SECONDS: int = _int_env("DB_POOL_RECYCLE_SECONDS", 1800)
+DB_POOL_TIMEOUT_SECONDS: int = _int_env("DB_POOL_TIMEOUT_SECONDS", 30)
+
 # ---------------------------------------------------------------------------
 # JWT / Auth
 # ---------------------------------------------------------------------------

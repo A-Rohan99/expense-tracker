@@ -440,6 +440,13 @@ class Transaction(Base):
         Index("ix_txn_user_date", "user_id", "transaction_date"),
         # Household queries: "shared transactions for my household"
         Index("ix_txn_household", "user_id", "is_household_shared"),
+        # Instrument lookups. Credit-card outstanding and loan EMI state are
+        # derived by aggregating the ledger on these columns, so without the
+        # indexes every card summary is a full table scan that slows down as
+        # *other users'* ledgers grow.
+        Index("ix_txn_credit_card", "credit_card_id", "transaction_type"),
+        Index("ix_txn_loan", "loan_id", "transaction_type"),
+        Index("ix_txn_account", "account_id"),
     )
 
     # ── Relationships ──────────────────────────────────────────────────

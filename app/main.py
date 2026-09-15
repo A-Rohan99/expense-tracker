@@ -70,6 +70,9 @@ async def lifespan(application: FastAPI):
         DOCS_ENABLED,
     )
     if not IS_PRODUCTION:
+        # Convenience for a fresh dev checkout. Alembic is the source of truth
+        # everywhere — run `alembic upgrade head` after pulling a schema change,
+        # because create_all can add a missing table but never alter one.
         Base.metadata.create_all(bind=engine)
     yield
     logger.info("Shutting down")
