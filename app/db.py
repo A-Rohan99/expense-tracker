@@ -53,9 +53,19 @@ class Base(DeclarativeBase):
 # Dependency for FastAPI route injection
 # ---------------------------------------------------------------------------
 def get_db():
-    """Yield a scoped DB session; guaranteed to close after the request."""
+    """
+    Yield a scoped DB session; guaranteed to close after the request.
+
+    The rollback matters: without it a failed ``commit()`` returns the
+    connection to the pool still carrying an aborted transaction, and on
+    Postgres the next request to pick it up fails with InFailedSqlTransaction —
+    one bad write cascading into unrelated endpoints.
+    """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

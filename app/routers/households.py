@@ -80,7 +80,12 @@ def leave_household(
 
     household_id = user.household_id
     user.household_id = None
-    db.commit()
+
+    # Flush rather than commit, so the membership count below sees the
+    # departure while staying inside one transaction. Committing here and again
+    # after the cleanup left a window where a crash orphaned a member-less
+    # household row permanently.
+    db.flush()
 
     # Clean up: delete the household if it has no remaining members.
     remaining = (
@@ -92,7 +97,8 @@ def leave_household(
         household = db.query(Household).filter(Household.id == household_id).first()
         if household:
             db.delete(household)
-            db.commit()
+
+    db.commit()
 
 
 # ── GET /me — current user's household ─────────────────────────────────────

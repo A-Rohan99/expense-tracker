@@ -215,7 +215,7 @@ class LoanCreate(BaseModel):
     loan_type: LoanType = LoanType.personal
     principal_amount: PositiveAmount
     interest_rate: Annotated[Decimal, Field(ge=0, max_digits=5, decimal_places=2)]
-    tenure_months: int = Field(gt=0)
+    tenure_months: int = Field(gt=0, le=600)
     outstanding_balance: PositiveAmount
     start_date: date
     currency: str = Field(default="INR", min_length=3, max_length=3)
@@ -401,7 +401,7 @@ class EMICalculationRequest(BaseModel):
     """Standalone EMI calculator (no loan record required)."""
     principal: PositiveAmount
     annual_rate: Annotated[Decimal, Field(ge=0, max_digits=5, decimal_places=2)]
-    tenure_months: int = Field(gt=0)
+    tenure_months: int = Field(gt=0, le=600)
 
 
 class EMICalculationResponse(BaseModel):

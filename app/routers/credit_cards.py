@@ -7,13 +7,13 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_active_user
 from app.db import get_db
 from app.models import CreditCard, Transaction, User
-from app.routers import get_or_404, to_decimal
+from app.routers import get_or_404, money, to_decimal
 from app.schemas import (
     CreditCardCreate,
     CreditCardRead,
@@ -23,6 +23,81 @@ from app.schemas import (
 from app.services.finance import get_statement_cycle
 
 router = APIRouter(prefix="/credit-cards", tags=["credit cards"])
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Derived amounts
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _attach_derived_amounts(db: Session, cards: list[CreditCard]) -> list[CreditCard]:
+    """
+    Populate ``billed_amount`` / ``unbilled_amount`` / ``available_limit``.
+
+    These are response-only fields with no backing column — outstanding is
+    always derived from the ledger so it cannot drift. They used to be left at
+    their schema default, so every card in a list response reported an
+    available limit of 0.00 regardless of its real balance.
+
+    Aggregates for the whole set are fetched in three grouped queries rather
+    than three per card, so adding cards doesn't add round-trips.
+    """
+    if not cards:
+        return cards
+
+    card_ids = [c.id for c in cards]
+
+    def _totals(txn_type: str) -> dict[str, Decimal]:
+        rows = (
+            db.query(
+                Transaction.credit_card_id,
+                func.coalesce(func.sum(Transaction.amount), 0),
+            )
+            .filter(
+                Transaction.credit_card_id.in_(card_ids),
+                Transaction.transaction_type == txn_type,
+            )
+            .group_by(Transaction.credit_card_id)
+            .all()
+        )
+        return {card_id: to_decimal(total) for card_id, total in rows}
+
+    charges = _totals("expense")
+    payments = _totals("transfer")
+
+    # Unbilled depends on each card's own statement date, so build one query
+    # with a per-card cutoff rather than looping.
+    cycles = {c.id: get_statement_cycle(c.statement_day, c.due_day) for c in cards}
+    unbilled_clauses = [
+        and_(
+            Transaction.credit_card_id == c.id,
+            Transaction.transaction_date > cycles[c.id]["last_statement_date"],
+        )
+        for c in cards
+    ]
+    unbilled_rows = (
+        db.query(
+            Transaction.credit_card_id,
+            func.coalesce(func.sum(Transaction.amount), 0),
+        )
+        .filter(
+            Transaction.transaction_type == "expense",
+            or_(*unbilled_clauses),
+        )
+        .group_by(Transaction.credit_card_id)
+        .all()
+    )
+    unbilled_by_card = {card_id: to_decimal(total) for card_id, total in unbilled_rows}
+
+    zero = Decimal("0.00")
+    for card in cards:
+        outstanding = charges.get(card.id, zero) - payments.get(card.id, zero)
+        unbilled = unbilled_by_card.get(card.id, zero)
+        card.unbilled_amount = money(unbilled)
+        card.billed_amount = money(max(outstanding - unbilled, zero))
+        card.available_limit = money(
+            to_decimal(card.total_limit) - max(outstanding, zero)
+        )
+    return cards
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -36,13 +111,14 @@ def list_credit_cards(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ):
-    return (
+    cards = (
         db.query(CreditCard)
         .filter(CreditCard.user_id == user.id)
         .offset(skip)
         .limit(limit)
         .all()
     )
+    return _attach_derived_amounts(db, cards)
 
 
 @router.post("/", response_model=CreditCardRead, status_code=201)
@@ -72,7 +148,8 @@ def get_credit_card(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ):
-    return get_or_404(db, CreditCard, card_id, user_id=user.id)
+    card = get_or_404(db, CreditCard, card_id, user_id=user.id)
+    return _attach_derived_amounts(db, [card])[0]
 
 
 @router.patch("/{card_id}", response_model=CreditCardRead)

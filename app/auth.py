@@ -10,6 +10,8 @@ Provides:
 
 from __future__ import annotations
 
+import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -32,18 +34,44 @@ from app.models import User
 # ---------------------------------------------------------------------------
 
 
+# bcrypt refuses inputs over 72 bytes (it does not silently truncate), so a
+# long password raised ValueError straight out of hashpw/checkpw — a 500 on
+# register, and a 500 from the *unauthenticated* login endpoint where a 401 was
+# the correct answer. Hashing to a fixed-width digest first removes the limit
+# entirely and keeps the full password's entropy. Base64 because the digest is
+# raw bytes and bcrypt stops at the first NUL.
+def _bcrypt_input(plain: str) -> bytes:
+    digest = hashlib.sha256(plain.encode("utf-8")).digest()
+    return base64.b64encode(digest)
+
+
 def hash_password(plain: str) -> str:
     """Return a bcrypt hash of *plain*."""
     return bcrypt.hashpw(
-        plain.encode("utf-8"), bcrypt.gensalt()
+        _bcrypt_input(plain), bcrypt.gensalt()
     ).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Check *plain* against a bcrypt *hashed* value."""
-    return bcrypt.checkpw(
-        plain.encode("utf-8"), hashed.encode("utf-8")
-    )
+    encoded = hashed.encode("utf-8")
+    try:
+        if bcrypt.checkpw(_bcrypt_input(plain), encoded):
+            return True
+    except ValueError:
+        # Malformed stored hash — treat as a failed login, never a 500.
+        return False
+
+    # Hashes written before the pre-digest above used the raw password bytes.
+    # Keep accepting them so existing accounts still log in; anything over 72
+    # bytes could never have been stored that way, so don't even try.
+    raw = plain.encode("utf-8")
+    if len(raw) > 72:
+        return False
+    try:
+        return bcrypt.checkpw(raw, encoded)
+    except ValueError:
+        return False
 
 
 # ---------------------------------------------------------------------------
