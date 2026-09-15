@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/theme.dart';
 import '../models/dashboard_summary.dart';
@@ -68,11 +69,21 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                   // Private vs Household Switch
-                  HouseholdToggle(
-                    isHousehold: isHousehold,
-                    onChanged: (val) {
-                      ref.read(householdModeProvider.notifier).setMode(val);
-                    },
+                  Row(
+                    children: [
+                      HouseholdToggle(
+                        isHousehold: isHousehold,
+                        onChanged: (val) {
+                          ref.read(householdModeProvider.notifier).setMode(val);
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.tune_rounded, size: 20),
+                        color: AppColors.textTertiary,
+                        tooltip: 'Manage accounts, cards and loans',
+                        onPressed: () => context.push('/manage'),
+                      ),
+                    ],
                   ),
                 ],
               ),

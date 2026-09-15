@@ -4,6 +4,7 @@
 /// and configures GoRouter for declarative navigation.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,7 @@ import 'core/api_service.dart';
 import 'core/theme.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/manage_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Splash screen (shown while the persisted session is checked)
@@ -61,7 +63,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/',
-    debugLogDiagnostics: true,
+    // Chatty in release; only useful while developing routing.
+    debugLogDiagnostics: kDebugMode,
 
     // ── Redirect logic ──────────────────────────────────────────────
     redirect: (context, state) {
@@ -94,6 +97,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: '/manage',
+        builder: (context, state) => const ManageScreen(),
       ),
     ],
   );
