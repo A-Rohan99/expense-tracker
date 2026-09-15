@@ -26,8 +26,13 @@ class PendingEmisSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeLoans = loans.where((l) => l.isActive && l.outstandingBalance > 0).toList();
+    final activeLoans =
+        loans.where((l) => l.isActive && l.outstandingBalance > 0).toList();
     if (activeLoans.isEmpty) return const SizedBox.shrink();
+
+    // "Due" means not yet paid this month, per the server. Counting every
+    // active loan claimed money was owed that had already been paid.
+    final dueCount = activeLoans.where((l) => !l.emiPaidThisMonth).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,7 +65,7 @@ class PendingEmisSection extends ConsumerWidget {
                   border: Border.all(color: AppColors.subtleBorder),
                 ),
                 child: Text(
-                  '${activeLoans.length} DUE THIS MONTH',
+                  '$dueCount DUE THIS MONTH',
                   style: AppTypography.labelSmall.copyWith(
                     color: AppColors.textTertiary,
                     fontSize: 9.5,
@@ -84,6 +89,9 @@ class PendingEmisSection extends ConsumerWidget {
             itemBuilder: (context, index) {
               final loan = activeLoans[index];
               return _EmiTickCard(
+                // Keyed by loan id so per-card state follows the loan, not the
+                // list position, when the list reorders after a refresh.
+                key: ValueKey(loan.id),
                 loan: loan,
                 accounts: accounts,
               );
@@ -97,6 +105,7 @@ class PendingEmisSection extends ConsumerWidget {
 
 class _EmiTickCard extends ConsumerStatefulWidget {
   const _EmiTickCard({
+    super.key,
     required this.loan,
     required this.accounts,
   });
@@ -109,7 +118,9 @@ class _EmiTickCard extends ConsumerStatefulWidget {
 }
 
 class _EmiTickCardState extends ConsumerState<_EmiTickCard> {
-  bool _isPaid = false;
+  /// Seeded from the server so a restart doesn't resurrect a paid EMI.
+  /// Flipped locally only to play the success animation after paying.
+  late bool _isPaid = widget.loan.emiPaidThisMonth;
   bool _isProcessing = false;
   Map<String, dynamic>? _paymentResult;
 

@@ -237,6 +237,11 @@ class LoanRead(BaseModel):
     is_active: bool
     created_at: datetime
 
+    # Derived from the ledger, not stored — mirrors how credit-card
+    # outstanding is computed, so it can never drift from reality.
+    emi_paid_this_month: bool = False
+    last_emi_payment_date: date | None = None
+
 
 class LoanUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=120)

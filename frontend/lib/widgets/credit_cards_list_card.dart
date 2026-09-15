@@ -77,7 +77,9 @@ class CreditCardsListCard extends StatelessWidget {
               final totalLimit = summary?.totalLimit ?? card.totalLimit;
               final billed = summary?.billedAmount ?? card.billedAmount;
               final unbilled = summary?.unbilledAmount ?? card.unbilledAmount;
-              final daysUntilDue = summary?.daysUntilDue ?? 15;
+              // Null means the billing cycle is unknown; never default to a
+              // comfortable-looking number, which reads as fact.
+              final daysUntilDue = summary?.daysUntilDue;
               final usageRatio = totalLimit > 0 ? (outstanding / totalLimit).clamp(0.0, 1.0) : 0.0;
 
               return Column(
@@ -132,13 +134,19 @@ class CreditCardsListCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            daysUntilDue >= 0
-                                ? 'Due in $daysUntilDue days'
-                                : 'Overdue by ${daysUntilDue.abs()} days',
+                            daysUntilDue == null
+                                ? 'Due date unavailable'
+                                : daysUntilDue >= 0
+                                    ? 'Due in $daysUntilDue days'
+                                    : 'Overdue by ${daysUntilDue.abs()} days',
                             style: AppTypography.bodySmall.copyWith(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
-                              color: daysUntilDue <= 3 ? AppColors.neonPink : AppColors.neonCyan,
+                              color: daysUntilDue == null
+                                  ? AppColors.textTertiary
+                                  : daysUntilDue <= 3
+                                      ? AppColors.neonPink
+                                      : AppColors.neonCyan,
                             ),
                           ),
                         ],

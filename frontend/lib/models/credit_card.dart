@@ -51,6 +51,12 @@ class CreditCard {
   }
 }
 
+/// Billing snapshot for a card, as computed by `/credit-cards/{id}/summary`.
+///
+/// The cycle dates are nullable on purpose. When the summary call fails the
+/// app must say "unknown" rather than guess: a fabricated due date renders as
+/// a confident countdown badge and can make someone miss a real payment.
+/// Check [hasCycleInfo] before showing anything date-driven.
 class CreditCardSummary {
   const CreditCardSummary({
     required this.cardId,
@@ -62,10 +68,10 @@ class CreditCardSummary {
     required this.availableLimit,
     required this.totalPayments,
     required this.minDueAmount,
-    required this.lastStatementDate,
-    required this.nextStatementDate,
-    required this.dueDate,
-    required this.daysUntilDue,
+    this.lastStatementDate,
+    this.nextStatementDate,
+    this.dueDate,
+    this.daysUntilDue,
   });
 
   final String cardId;
@@ -77,10 +83,15 @@ class CreditCardSummary {
   final double availableLimit;
   final double totalPayments;
   final double minDueAmount;
-  final DateTime lastStatementDate;
-  final DateTime nextStatementDate;
-  final DateTime dueDate;
-  final int daysUntilDue;
+  final DateTime? lastStatementDate;
+  final DateTime? nextStatementDate;
+
+  /// Null when the billing cycle could not be fetched — never a guess.
+  final DateTime? dueDate;
+  final int? daysUntilDue;
+
+  /// Whether this summary carries real billing-cycle dates from the server.
+  bool get hasCycleInfo => dueDate != null && daysUntilDue != null;
 
   factory CreditCardSummary.fromJson(Map<String, dynamic> json) {
     return CreditCardSummary(
@@ -93,10 +104,12 @@ class CreditCardSummary {
       availableLimit: (num.tryParse(json['available_limit'].toString()) ?? 0).toDouble(),
       totalPayments: (num.tryParse(json['total_payments'].toString()) ?? 0).toDouble(),
       minDueAmount: (num.tryParse(json['min_due_amount'].toString()) ?? 0).toDouble(),
-      lastStatementDate: DateTime.tryParse(json['last_statement_date'] as String? ?? '') ?? DateTime.now(),
-      nextStatementDate: DateTime.tryParse(json['next_statement_date'] as String? ?? '') ?? DateTime.now(),
-      dueDate: DateTime.tryParse(json['due_date'] as String? ?? '') ?? DateTime.now(),
-      daysUntilDue: json['days_until_due'] as int? ?? 0,
+      lastStatementDate:
+          DateTime.tryParse(json['last_statement_date'] as String? ?? ''),
+      nextStatementDate:
+          DateTime.tryParse(json['next_statement_date'] as String? ?? ''),
+      dueDate: DateTime.tryParse(json['due_date'] as String? ?? ''),
+      daysUntilDue: json['days_until_due'] as int?,
     );
   }
 }

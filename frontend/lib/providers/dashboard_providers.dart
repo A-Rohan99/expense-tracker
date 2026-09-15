@@ -56,7 +56,10 @@ final creditCardSummariesProvider = FutureProvider<List<CreditCardSummary>>((ref
         final response = await dio.get('/credit-cards/${card.id}/summary');
         return CreditCardSummary.fromJson(response.data as Map<String, dynamic>);
       } catch (_) {
-        // Fallback to card base fields if summary computation has no transactions
+        // Fall back to the amounts the card list already carries, but leave
+        // the billing-cycle dates null. Inventing a due date here rendered as
+        // a confident "Due in 15d" badge and could make someone miss a real
+        // payment — the UI shows "due date unavailable" instead.
         return CreditCardSummary(
           cardId: card.id,
           cardName: card.name,
@@ -69,10 +72,6 @@ final creditCardSummariesProvider = FutureProvider<List<CreditCardSummary>>((ref
               : card.totalLimit - (card.billedAmount + card.unbilledAmount),
           totalPayments: 0.0,
           minDueAmount: 0.0,
-          lastStatementDate: DateTime.now(),
-          nextStatementDate: DateTime.now().add(const Duration(days: 30)),
-          dueDate: DateTime.now().add(const Duration(days: 15)),
-          daysUntilDue: 15,
         );
       }
     }),

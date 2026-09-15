@@ -7,7 +7,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_active_user
@@ -32,6 +33,66 @@ from app.services.finance import (
 
 router = APIRouter(prefix="/loans", tags=["loans"])
 
+# Category written by pay_emi; distinguishes a scheduled instalment from an
+# ad-hoc prepayment made through POST /transactions/.
+EMI_CATEGORY = "EMI Payment"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Derived EMI payment state
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _month_start(today: date | None = None) -> date:
+    today = today or date.today()
+    return date(today.year, today.month, 1)
+
+
+def _last_emi_payment(db: Session, loan_id: str) -> date | None:
+    """Date of the most recent EMI payment recorded against *loan_id*."""
+    return (
+        db.query(func.max(Transaction.transaction_date))
+        .filter(
+            Transaction.loan_id == loan_id,
+            Transaction.transaction_type == "transfer",
+            Transaction.category == EMI_CATEGORY,
+        )
+        .scalar()
+    )
+
+
+def _attach_emi_state(db: Session, loans: list[Loan]) -> list[Loan]:
+    """
+    Populate ``emi_paid_this_month`` / ``last_emi_payment_date``.
+
+    The client used to track "paid" in widget state alone, so restarting the
+    app made an already-paid EMI look payable again — and nothing stopped the
+    second deduction. The server is the only place that can answer this
+    honestly, so it does, in one grouped query for the whole set.
+    """
+    if not loans:
+        return loans
+
+    rows = (
+        db.query(
+            Transaction.loan_id,
+            func.max(Transaction.transaction_date),
+        )
+        .filter(
+            Transaction.loan_id.in_([loan.id for loan in loans]),
+            Transaction.transaction_type == "transfer",
+            Transaction.category == EMI_CATEGORY,
+        )
+        .group_by(Transaction.loan_id)
+        .all()
+    )
+    last_paid = {loan_id: paid_on for loan_id, paid_on in rows}
+    month_start = _month_start()
+
+    for loan in loans:
+        paid_on = last_paid.get(loan.id)
+        loan.last_emi_payment_date = paid_on
+        loan.emi_paid_this_month = paid_on is not None and paid_on >= month_start
+    return loans
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CRUD
@@ -44,13 +105,14 @@ def list_loans(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ):
-    return (
+    loans = (
         db.query(Loan)
         .filter(Loan.user_id == user.id)
         .offset(skip)
         .limit(limit)
         .all()
     )
+    return _attach_emi_state(db, loans)
 
 
 @router.post("/", response_model=LoanRead, status_code=201)
@@ -82,7 +144,8 @@ def get_loan(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ):
-    return get_or_404(db, Loan, loan_id, user_id=user.id)
+    loan = get_or_404(db, Loan, loan_id, user_id=user.id)
+    return _attach_emi_state(db, [loan])[0]
 
 
 @router.patch("/{loan_id}", response_model=LoanRead)
@@ -175,6 +238,19 @@ def pay_emi(
     outstanding = to_decimal(loan.outstanding_balance)
     if outstanding <= 0:
         raise HTTPException(400, detail="Loan is already fully paid off")
+
+    # One EMI per calendar month. The client cannot enforce this — it forgets
+    # on restart, and a double tap or a stale screen would otherwise deduct
+    # twice. Checked here, inside the same locked transaction as the write.
+    already_paid_on = _last_emi_payment(db, loan.id)
+    if already_paid_on is not None and already_paid_on >= _month_start():
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=(
+                f"This month's EMI for '{loan.name}' was already paid on "
+                f"{already_paid_on.isoformat()}."
+            ),
+        )
 
     # ── Calculate EMI and breakdown ────────────────────────────────────
     emi_data = calculate_emi(

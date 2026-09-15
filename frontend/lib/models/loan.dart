@@ -38,6 +38,8 @@ class Loan {
     required this.currency,
     required this.isActive,
     required this.createdAt,
+    this.emiPaidThisMonth = false,
+    this.lastEmiPaymentDate,
   });
 
   final String id;
@@ -53,6 +55,11 @@ class Loan {
   final bool isActive;
   final DateTime createdAt;
 
+  /// Derived server-side from the ledger. Never trust widget state for
+  /// this — a restart used to make a paid EMI look payable again.
+  final bool emiPaidThisMonth;
+  final DateTime? lastEmiPaymentDate;
+
   factory Loan.fromJson(Map<String, dynamic> json) {
     return Loan(
       id: json['id'] as String,
@@ -67,6 +74,9 @@ class Loan {
       currency: json['currency'] as String? ?? 'INR',
       isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+      emiPaidThisMonth: json['emi_paid_this_month'] as bool? ?? false,
+      lastEmiPaymentDate:
+          DateTime.tryParse(json['last_emi_payment_date'] as String? ?? ''),
     );
   }
 }

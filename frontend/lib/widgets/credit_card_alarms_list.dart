@@ -19,6 +19,10 @@ enum CardAlarmSeverity {
   subtle,
   warningAmber,
   overdueRed,
+
+  /// The billing cycle could not be fetched. Distinct from [subtle] on
+  /// purpose: "we don't know" must not look like "nothing due soon".
+  unknown,
 }
 
 class CreditCardAlarmsList extends StatelessWidget {
@@ -86,6 +90,8 @@ class CreditCardAlarmsList extends StatelessWidget {
             separatorBuilder: (context, index) => const SizedBox(width: AppSpacing.md),
             itemBuilder: (context, index) {
               final card = cards[index];
+              // No summary for this card means the billing cycle is unknown.
+              // Leave the dates null rather than guessing one.
               final summary = summaryMap[card.id] ??
                   CreditCardSummary(
                     cardId: card.id,
@@ -94,13 +100,10 @@ class CreditCardAlarmsList extends StatelessWidget {
                     billedAmount: card.billedAmount,
                     unbilledAmount: card.unbilledAmount,
                     totalOutstanding: card.billedAmount + card.unbilledAmount,
-                    availableLimit: card.totalLimit - (card.billedAmount + card.unbilledAmount),
+                    availableLimit:
+                        card.totalLimit - (card.billedAmount + card.unbilledAmount),
                     totalPayments: 0.0,
                     minDueAmount: 0.0,
-                    lastStatementDate: DateTime.now(),
-                    nextStatementDate: DateTime.now().add(const Duration(days: 30)),
-                    dueDate: DateTime.now().add(const Duration(days: 15)),
-                    daysUntilDue: 15,
                   );
 
               return _CreditCardAlarmItem(
@@ -128,8 +131,12 @@ class _CreditCardAlarmItem extends StatelessWidget {
   final List<Account> accounts;
 
   CardAlarmSeverity get _severity {
-    if (summary.daysUntilDue < 0) return CardAlarmSeverity.overdueRed;
-    if (summary.daysUntilDue <= 7) return CardAlarmSeverity.warningAmber;
+    final days = summary.daysUntilDue;
+    // No cycle info means we genuinely don't know when this is due. Falling
+    // through to `subtle` would quietly imply "plenty of time".
+    if (days == null) return CardAlarmSeverity.unknown;
+    if (days < 0) return CardAlarmSeverity.overdueRed;
+    if (days <= 7) return CardAlarmSeverity.warningAmber;
     return CardAlarmSeverity.subtle;
   }
 
@@ -141,6 +148,8 @@ class _CreditCardAlarmItem extends StatelessWidget {
         return AppColors.neonAmber;
       case CardAlarmSeverity.subtle:
         return AppColors.neonCyan;
+      case CardAlarmSeverity.unknown:
+        return AppColors.textTertiary;
     }
   }
 
@@ -361,7 +370,7 @@ class _CreditCardAlarmItem extends StatelessWidget {
 
     switch (_severity) {
       case CardAlarmSeverity.overdueRed:
-        label = 'OVERDUE ${days.abs()}d';
+        label = 'OVERDUE ${days!.abs()}d';
         icon = Icons.error_outline_rounded;
         color = AppColors.neonRed;
       case CardAlarmSeverity.warningAmber:
@@ -371,6 +380,10 @@ class _CreditCardAlarmItem extends StatelessWidget {
       case CardAlarmSeverity.subtle:
         label = 'Due in ${days}d';
         icon = Icons.calendar_today_rounded;
+        color = AppColors.textTertiary;
+      case CardAlarmSeverity.unknown:
+        label = 'DUE DATE UNAVAILABLE';
+        icon = Icons.help_outline_rounded;
         color = AppColors.textTertiary;
     }
 
