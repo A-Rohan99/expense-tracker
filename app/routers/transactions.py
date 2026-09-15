@@ -8,6 +8,8 @@ PATCH /  → metadata-only updates (amount is immutable).
 
 from __future__ import annotations
 
+import logging
+
 from datetime import date
 from decimal import Decimal
 
@@ -27,6 +29,8 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+logger = logging.getLogger("app.transactions")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -194,6 +198,25 @@ def create_transaction(
     db.add(txn)
     db.commit()
     db.refresh(txn)
+
+    logger.info(
+        "Recorded %s of %s",
+        body.transaction_type.value,
+        amount,
+        extra={"extra_fields": {
+            "audit": True,
+            "user_id": user.id,
+            "txn_id": txn.id,
+            "type": body.transaction_type.value,
+            "amount": str(amount),
+            "account_id": body.account_id,
+            "credit_card_id": body.credit_card_id,
+            "loan_id": body.loan_id,
+            "account_balance_after": (
+                str(account.current_balance) if account else None
+            ),
+        }},
+    )
     return txn
 
 

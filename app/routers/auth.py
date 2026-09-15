@@ -4,7 +4,9 @@ Auth routes — register, login, token refresh, and current-user info.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -26,6 +28,8 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+logger = logging.getLogger("app.auth")
 
 
 # ── POST /register ─────────────────────────────────────────────────────────
@@ -77,8 +81,8 @@ def login(
         )
 
     return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user.id, token_version=user.token_version),
+        refresh_token=create_refresh_token(user.id, token_version=user.token_version),
     )
 
 
@@ -96,9 +100,17 @@ def refresh(body: RefreshTokenRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # A refresh token from before the last logout must not mint a new pair.
+    if payload.get("ver", 0) != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been signed out",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user.id, token_version=user.token_version),
+        refresh_token=create_refresh_token(user.id, token_version=user.token_version),
     )
 
 
@@ -108,3 +120,26 @@ def refresh(body: RefreshTokenRequest, db: Session = Depends(get_db)):
 def me(user: User = Depends(get_current_active_user)):
     """Return the authenticated user's profile."""
     return user
+
+
+# ── POST /logout ───────────────────────────────────────────────────────────
+
+@router.post("/logout", status_code=204)
+def logout(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_active_user),
+):
+    """
+    Sign out everywhere.
+
+    Bumps the user's token version, which invalidates every access and refresh
+    token already issued. Previously there was no logout at all: a stolen
+    refresh token stayed usable for its full 7-day life and the only kill
+    switch was deactivating the account, which locks the real user out too.
+    """
+    user.token_version += 1
+    db.commit()
+    logger.info("User signed out of all sessions", extra={
+        "extra_fields": {"user_id": user.id},
+    })
+    return Response(status_code=204)

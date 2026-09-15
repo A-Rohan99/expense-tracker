@@ -1,6 +1,7 @@
 /// CRED-inspired Dashboard screen showcasing liquid balance, debt, and cashflow.
 library;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -286,7 +287,9 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              error.toString(),
+              // Never surface error.toString(): for a Dio failure that is a
+              // stack-ish dump including the internal API URL.
+              _friendlyError(error),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -311,4 +314,28 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Turn an exception into something a person can act on.
+///
+/// The server sends `{"detail": ..., "request_id": ...}`; the request id is
+/// worth showing because it is the thread back to the server-side log line.
+String _friendlyError(Object error) {
+  if (error is DioException) {
+    final data = error.response?.data;
+    if (data is Map) {
+      final detail = data['detail'];
+      final requestId = data['request_id'];
+      if (detail is String && detail.isNotEmpty) {
+        return requestId is String && requestId != '-'
+            ? '$detail (ref $requestId)'
+            : detail;
+      }
+    }
+    if (error.response == null) {
+      return 'Cannot reach the server. Check your connection and try again.';
+    }
+    return 'The server returned an error (HTTP ${error.response?.statusCode}).';
+  }
+  return 'Something went wrong. Pull down to try again.';
 }

@@ -4,6 +4,8 @@ Loan CRUD, EMI calculator utility, and Pay-EMI endpoint.
 
 from __future__ import annotations
 
+import logging
+
 from datetime import date
 from decimal import Decimal
 
@@ -32,6 +34,8 @@ from app.services.finance import (
 )
 
 router = APIRouter(prefix="/loans", tags=["loans"])
+
+logger = logging.getLogger("app.loans")
 
 # Category written by pay_emi; distinguishes a scheduled instalment from an
 # ad-hoc prepayment made through POST /transactions/.
@@ -300,6 +304,22 @@ def pay_emi(
     db.commit()
     db.refresh(txn)
     db.refresh(account)
+
+    logger.info(
+        "EMI paid for loan %s",
+        loan.name,
+        extra={"extra_fields": {
+            "audit": True,
+            "user_id": user.id,
+            "loan_id": loan.id,
+            "txn_id": txn.id,
+            "emi_amount": str(actual_deduction),
+            "principal_component": str(breakdown["principal_component"]),
+            "interest_component": str(breakdown["interest_component"]),
+            "outstanding_after": str(loan.outstanding_balance),
+            "account_balance_after": str(account.current_balance),
+        }},
+    )
 
     return EMIPaymentResponse(
         transaction_id=txn.id,

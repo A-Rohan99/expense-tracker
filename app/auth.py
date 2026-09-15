@@ -81,6 +81,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(
     subject: str,
     expires_delta: timedelta | None = None,
+    token_version: int = 0,
 ) -> str:
     """
     Create a short-lived access token.
@@ -97,7 +98,7 @@ def create_access_token(
         or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     return jwt.encode(
-        {"sub": subject, "exp": expire, "type": "access"},
+        {"sub": subject, "exp": expire, "type": "access", "ver": token_version},
         SECRET_KEY,
         algorithm=ALGORITHM,
     )
@@ -106,6 +107,7 @@ def create_access_token(
 def create_refresh_token(
     subject: str,
     expires_delta: timedelta | None = None,
+    token_version: int = 0,
 ) -> str:
     """Create a longer-lived refresh token used to rotate access tokens."""
     expire = datetime.now(timezone.utc) + (
@@ -113,7 +115,7 @@ def create_refresh_token(
         or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     )
     return jwt.encode(
-        {"sub": subject, "exp": expire, "type": "refresh"},
+        {"sub": subject, "exp": expire, "type": "refresh", "ver": token_version},
         SECRET_KEY,
         algorithm=ALGORITHM,
     )
@@ -178,6 +180,16 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # A token minted before the last logout is no longer valid. Tokens issued
+    # before this claim existed default to 0, matching a user who has never
+    # signed out, so existing sessions survive the upgrade.
+    if payload.get("ver", 0) != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session has been signed out",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user

@@ -10,6 +10,8 @@ opening the app posts any income that fell due while it was closed.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -29,6 +31,8 @@ from app.services.recurring import (
 )
 
 router = APIRouter(prefix="/recurring-income", tags=["recurring income"])
+
+logger = logging.getLogger("app.recurring_income")
 
 
 def _get_for_user(db: Session, user: User) -> RecurringIncome | None:
@@ -74,14 +78,46 @@ def get_recurring_income(
     """
     Return the standing instruction, or ``null`` if none is set up.
 
-    Posts any months that fell due since the last call, and reports how many
-    in ``posted_this_run`` so the UI can tell the user what just happened.
+    Read-only. Posting due months happens in ``POST /catch-up`` — a GET that
+    writes to the ledger misbehaves behind caches and client retry logic.
+    """
+    income = _get_for_user(db, user)
+    if income is None:
+        return None
+    return _to_read(db, income)
+
+
+# ── POST /catch-up ─────────────────────────────────────────────────────────
+
+@router.post("/catch-up", response_model=RecurringIncomeRead | None)
+def catch_up_recurring_income(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_active_user),
+):
+    """
+    Post any monthly income that fell due while the app was closed.
+
+    Called by the client on load. Safe to call repeatedly: the
+    ``last_posted_period`` key means a month is never posted twice, no matter
+    how often this runs. ``posted_this_run`` reports how many months landed so
+    the UI can explain the balance change.
     """
     income = _get_for_user(db, user)
     if income is None:
         return None
 
     posted = run_catch_up(db, income)
+    if posted:
+        logger.info(
+            "Posted %d month(s) of recurring income",
+            len(posted),
+            extra={"extra_fields": {
+                "audit": True,
+                "user_id": user.id,
+                "months_posted": len(posted),
+                "amount_each": str(income.amount),
+            }},
+        )
     return _to_read(db, income, len(posted))
 
 

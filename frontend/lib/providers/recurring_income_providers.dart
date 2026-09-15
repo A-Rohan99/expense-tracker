@@ -12,11 +12,17 @@ import '../core/api_service.dart';
 import '../models/recurring_income.dart';
 import 'dashboard_providers.dart';
 
-/// `null` when the user hasn't set one up.
+/// The standing instruction, or `null` when none is set up.
+///
+/// Posts via `POST /catch-up`, which lands any months that fell due while the
+/// app was closed and returns the updated instruction. It is idempotent — the
+/// server's `last_posted_period` key means a month is never posted twice — so
+/// calling it on every dashboard load is safe. A plain GET would not post
+/// anything: the server deliberately stopped mutating state on a read.
 final recurringIncomeProvider =
     FutureProvider<RecurringIncome?>((ref) async {
   final dio = ref.watch(dioProvider);
-  final response = await dio.get('/recurring-income/');
+  final response = await dio.post('/recurring-income/catch-up');
   final data = response.data;
   if (data == null) return null;
   return RecurringIncome.fromJson(data as Map<String, dynamic>);

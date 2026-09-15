@@ -105,6 +105,13 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(128), nullable=False)
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Bumped on logout / "sign out everywhere". Tokens carry the value they
+    # were minted with, so a mismatch invalidates every token issued before
+    # the bump. Without this a stolen refresh token stayed valid for its full
+    # 7-day life with no way to revoke it short of deactivating the account.
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0",
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False,
     )
