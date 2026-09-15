@@ -14,11 +14,28 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Change this to your deployed backend URL in production.
-const String kBaseUrl = 'http://10.0.2.2:8000/api/v1'; // Android emulator → host
-const String kBaseUrlWeb = 'http://localhost:8000/api/v1';
+/// Where the API lives.
+///
+/// Supplied at build time so the same source produces a local build and a
+/// deployed one:
+///
+///     flutter build web --release ///       --dart-define=API_BASE_URL=https://api.example.com/api/v1
+///
+/// Without this the URL was a compile-time const pointing at localhost, so the
+/// deployed web build talked to the user's own machine and failed on every
+/// call. Production must be https — browsers block mixed content, and Android
+/// and iOS both refuse cleartext by default.
+const String _apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
 
-String get baseUrl => kIsWeb ? kBaseUrlWeb : kBaseUrl;
+/// Fallbacks for local development only.
+/// 10.0.2.2 is the Android emulator's alias for the host machine.
+const String _devBaseUrlWeb = 'http://localhost:8000/api/v1';
+const String _devBaseUrlDevice = 'http://10.0.2.2:8000/api/v1';
+
+String get baseUrl {
+  if (_apiBaseUrlOverride.isNotEmpty) return _apiBaseUrlOverride;
+  return kIsWeb ? _devBaseUrlWeb : _devBaseUrlDevice;
+}
 
 // Secure storage keys
 const String _kAccessToken = 'access_token';

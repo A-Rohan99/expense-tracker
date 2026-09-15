@@ -1,0 +1,53 @@
+# Local development against the same database engine as production.
+#
+# Developing on SQLite and deploying on Postgres is how you discover dialect
+# differences in production. `docker compose up` gives you the real thing.
+#
+#   docker compose up --build
+#   API   http://localhost:8000
+#   docs  http://localhost:8000/docs
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: expense
+      POSTGRES_PASSWORD: expense_dev_password
+      POSTGRES_DB: expense_tracker
+    ports:
+      # Exposed so you can psql in; the API talks to it over the compose network.
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # The API's entrypoint runs migrations immediately, so it must not start
+      # until Postgres is genuinely accepting connections.
+      test: ["CMD-SHELL", "pg_isready -U expense -d expense_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://expense:expense_dev_password@db:5432/expense_tracker
+      # Development-only key. Production must supply its own via the platform's
+      # secret store — never a file, and never this value.
+      SECRET_KEY: local-development-only-not-a-real-secret-change-me
+      ALLOWED_ORIGINS: http://localhost:5000,http://127.0.0.1:5000
+      LOG_JSON: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live reload while developing; drop this for a production-like run.
+      - ./app:/app/app:ro
+      - ./migrations:/app/migrations:ro
+    command:
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  postgres_data:

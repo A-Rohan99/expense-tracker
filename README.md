@@ -1,124 +1,183 @@
 # Expense Tracker
 
-A web-based Expense Tracker built using **Python**, **Streamlit**, and **SQLite**. The application enables users to efficiently record, manage, and analyze their daily expenses through an intuitive interface while demonstrating CRUD (Create, Read, Update, Delete) operations using a relational database.
+A family expense tracker: a FastAPI backend over a double-entry ledger, and a
+Flutter client you install from the browser with **Add to Home Screen**.
+
+Tracks bank and cash accounts, credit cards with real billing cycles, loans
+with EMI schedules, and a standing monthly income that posts itself.
 
 ---
 
-## Features
+## Quick start
 
-* Add new expenses
-* View all recorded expenses
-* Update existing expenses
-* Delete expenses
-* View total expenditure
-* View category-wise expense summary
-* Persistent data storage using SQLite
-* Simple and interactive Streamlit interface
-
----
-
-## Technologies Used
-
-* Python 3
-* Streamlit
-* SQLite3
-
----
-
-## Project Structure
-
-```text
-Expense-Tracker/
-│
-├── app.py              # Streamlit application
-├── database.py         # SQLite database operations
-├── requirements.txt    # Project dependencies
-├── README.md
-└── .gitignore
-```
-
-> **Note:** `expenses.db` is created automatically when the application is run for the first time.
-
----
-
-## Installation
-
-### Clone the repository
-
-```bash
-git clone https://github.com/Yash-gif-pixel/Expense-Tracker.git
-```
-
-### Navigate to the project
-
-```bash
-cd Expense-Tracker
-```
-
-### Create a virtual environment
+You need Python 3.12+ and the Flutter SDK. Docker is optional but gives you the
+same database engine production uses.
 
 ```bash
 python -m venv .venv
+.venv\Scripts\activate          # Windows;  source .venv/bin/activate elsewhere
+pip install -r requirements-dev.txt
 ```
 
-### Activate the virtual environment
-
-**Windows**
+Create a `.env` in the repo root:
 
 ```bash
-.venv\Scripts\activate
+SECRET_KEY=paste-a-generated-value-here
+ENVIRONMENT=development
 ```
 
-### Install dependencies
+Generate the key with:
 
 ```bash
-pip install -r requirements.txt
+python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
-### Run the application
+Then create the schema and start the API:
 
 ```bash
-streamlit run app.py
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+The API is on http://localhost:8000, with docs at `/docs` (development only).
+
+In a second terminal, run the client:
+
+```bash
+cd frontend
+flutter pub get
+flutter run -d chrome
+```
+
+### With Docker instead
+
+Runs the API against Postgres, matching production:
+
+```bash
+docker compose up --build
 ```
 
 ---
 
-## Database
+## Layout
 
-The application uses **SQLite** for persistent data storage.
-
-The database is automatically created on the first run and currently stores:
-
-* Expense ID
-* Category
-* Amount
-
----
-
-## Skills Demonstrated
-
-* Python Programming
-* CRUD Operations
-* SQLite Database Integration
-* Streamlit Application Development
-* Modular Project Structure
-* Git & GitHub
-
----
-
-## Future Improvements
-
-* Interactive charts and visualizations
-* Monthly expense reports
-* Budget planning
-* Export expenses to CSV/PDF
-* User authentication
-* Expense filtering and search
+```
+app/                 FastAPI backend
+  main.py            app factory, middleware, health checks
+  config.py          all settings; fails closed on anything production needs
+  models.py          SQLAlchemy models — 7 tables
+  schemas.py         Pydantic request/response shapes
+  money.py           Decimal helpers; money never touches float
+  auth.py            JWT, password hashing, token versioning
+  errors.py          global exception handlers
+  logging_config.py  structured logging + request correlation ids
+  middleware.py      request context, auth rate limiting
+  routers/           one module per resource
+  services/          pure finance and recurring-income logic
+migrations/          Alembic; owns the schema
+tests/               pytest suite
+frontend/            Flutter client (lib/, test/, web/)
+```
 
 ---
 
-## Author
+## Configuration
 
-**Yash Malik**
+Everything comes from environment variables. Anything dangerous to get wrong is
+**required in production** — the process refuses to start rather than falling
+back to a development default.
 
-GitHub: https://github.com/Yash-gif-pixel
+| Variable | Required | Default | Notes |
+|---|---|---|---|
+| `SECRET_KEY` | **always** | — | JWT signing key |
+| `ENVIRONMENT` | no | `development` | `production` tightens the rules below |
+| `DATABASE_URL` | in production | local SQLite | e.g. `postgresql+psycopg://user:pass@host:5432/db` |
+| `ALLOWED_ORIGINS` | in production | localhost dev ports | comma-separated origins |
+| `DOCS_ENABLED` | no | on outside production | serves `/docs`, `/redoc`, `/openapi.json` |
+| `AUTH_RATE_LIMIT` | no | `20/minute` | budget of *failed* auth attempts per IP |
+| `LOG_JSON` | no | on in production | JSON log lines |
+| `LOG_LEVEL` | no | `INFO` | |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | no | `30` | |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | no | `7` | |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | no | `5` / `10` | Postgres only |
+
+`DATABASE_URL` deliberately has no production default: a container that forgot
+it would otherwise boot against an ephemeral SQLite file and discard every
+write on restart.
+
+---
+
+## Tests
+
+```bash
+pytest                    # backend, 107 tests
+cd frontend && flutter test   # client, 50 tests
+```
+
+The backend suite runs on SQLite for speed. CI runs it against Postgres as
+well, because dialect differences are exactly what would otherwise surface in
+production.
+
+---
+
+## Deploying
+
+The target is a container on a managed platform (Railway, Render, Fly) with
+managed Postgres, and the Flutter web build served as static files.
+
+**1. Backend.** Build and push the image; the entrypoint runs
+`alembic upgrade head` before starting, so a failed migration stops the deploy
+rather than leaving a process serving an old schema.
+
+Set at minimum:
+
+```
+ENVIRONMENT=production
+SECRET_KEY=<a fresh generated value, from the platform's secret store>
+DATABASE_URL=<managed Postgres URL>
+ALLOWED_ORIGINS=https://your-web-origin
+```
+
+Point the platform's health check at `/health`, and its readiness check at
+`/health/ready`, which actually touches the database.
+
+**2. Client.** The API URL is baked in at build time:
+
+```bash
+cd frontend
+flutter build web --release \
+  --dart-define=API_BASE_URL=https://your-api-host/api/v1
+```
+
+Serve `build/web/` as static files. It must be **https** — browsers block
+mixed content, so an http API from an https page will fail silently.
+
+**3. Install it.** Open the URL on a phone and use *Add to Home Screen*.
+
+---
+
+## Schema changes
+
+Alembic owns the schema. `create_all` runs only outside production, and only as
+a convenience for a fresh checkout — it can add a missing table but never alter
+an existing one.
+
+```bash
+# after editing app/models.py
+alembic revision --autogenerate -m "what changed"
+alembic upgrade head
+```
+
+`alembic check` fails if the models and migrations have drifted; CI runs it.
+
+---
+
+## Notes
+
+- **Money is `Decimal` everywhere.** Never cast it to `float`: Postgres rounds
+  on write where SQLite does not, so a float round-trip makes the same inputs
+  produce different balances on the two backends. Use `app/money.py`.
+- **Derived values are derived.** Credit-card outstanding and loan EMI state
+  are computed from the ledger on read, never stored, so they cannot drift.
+- **Every error carries a `request_id`**, echoed as `X-Request-ID`, which ties
+  a user's report to the exact server log line.

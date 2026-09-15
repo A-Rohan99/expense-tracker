@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A superseded run has nothing useful left to say.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    services:
+      # Test against the engine production uses, not SQLite. Dialect
+      # differences are exactly what a CI run should catch.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: expense
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: expense_tracker_test
+        options: >-
+          --health-cmd "pg_isready -U expense"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      ENVIRONMENT: test
+      SECRET_KEY: ci-only-secret-not-used-anywhere-real
+      DATABASE_URL: postgresql+psycopg://expense:ci_password@localhost:5432/expense_tracker_test
+      ALLOWED_ORIGINS: http://localhost:5000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the Dockerfile, not the 3.14 used on the dev machine.
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Check migrations build the schema from empty
+        run: alembic upgrade head
+
+      - name: Check models and migrations agree
+        # Autogenerate should find nothing; if it does, someone changed a model
+        # without writing the migration.
+        run: |
+          alembic check
+
+      - name: Run tests
+        run: pytest -q
+
+  frontend:
+    name: Flutter
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build web
+        # Proves the release build compiles with a real API URL wired in.
+        run: |
+          flutter build web --release \
+            --dart-define=API_BASE_URL=https://example.invalid/api/v1
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t expense-tracker-api:ci .
