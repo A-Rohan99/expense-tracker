@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-c",
+        "import dotenv, uvicorn; dotenv.load_dotenv(); uvicorn.run('app.main:app', host='127.0.0.1', port=8000, reload=True, reload_dirs=['app'])"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "5000", "--web-hostname", "127.0.0.1"],
+      "cwd": "frontend",
+      "port": 5000
+    }
+  ]
+}
