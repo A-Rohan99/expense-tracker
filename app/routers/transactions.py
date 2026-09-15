@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_active_user
 from app.db import get_db
 from app.models import Account, CreditCard, Loan, Transaction, User
-from app.routers import get_or_404, to_decimal
+from app.routers import get_or_404, money, to_decimal
 from app.schemas import (
     TransactionCreate,
     TransactionRead,
@@ -125,19 +125,22 @@ def create_transaction(
     credit_card: CreditCard | None = None
     loan: Loan | None = None
 
+    # Lock the instruments whose balances we are about to change.
     if body.account_id:
-        account = get_or_404(db, Account, body.account_id, user_id=user.id)
+        account = get_or_404(
+            db, Account, body.account_id, user_id=user.id, for_update=True
+        )
     if body.credit_card_id:
         credit_card = get_or_404(db, CreditCard, body.credit_card_id, user_id=user.id)
     if body.loan_id:
-        loan = get_or_404(db, Loan, body.loan_id, user_id=user.id)
+        loan = get_or_404(
+            db, Loan, body.loan_id, user_id=user.id, for_update=True
+        )
 
     # ── Apply balance mutations ────────────────────────────────────────
     if body.transaction_type == TransactionType.income:
         # Money IN → increase account balance
-        account.current_balance = float(
-            to_decimal(account.current_balance) + amount
-        )
+        account.current_balance = money(to_decimal(account.current_balance) + amount)
 
     elif body.transaction_type == TransactionType.expense:
         if account:
@@ -151,7 +154,7 @@ def create_transaction(
                         f"Required: {amount}, Available: {acct_bal}"
                     ),
                 )
-            account.current_balance = float(acct_bal - amount)
+            account.current_balance = money(acct_bal - amount)
         # If paid via credit card: no balance mutation here — the
         # CC summary endpoint derives outstanding from the ledger.
 
@@ -166,21 +169,19 @@ def create_transaction(
                     f"Required: {amount}, Available: {acct_bal}"
                 ),
             )
-        account.current_balance = float(acct_bal - amount)
+        account.current_balance = money(acct_bal - amount)
 
         # For loan payments via the generic endpoint (not /pay-emi),
         # reduce outstanding by the full transfer amount.
         if loan:
             outstanding = to_decimal(loan.outstanding_balance)
-            loan.outstanding_balance = float(
-                max(outstanding - amount, Decimal("0"))
-            )
+            loan.outstanding_balance = money(max(outstanding - amount, Decimal("0")))
 
     # ── Persist transaction ────────────────────────────────────────────
     txn = Transaction(
         user_id=user.id,
         transaction_type=body.transaction_type.value,
-        amount=float(amount),
+        amount=money(amount),
         currency=body.currency,
         transaction_date=body.transaction_date,
         category=body.category,
@@ -260,30 +261,26 @@ def delete_transaction(
     if txn.transaction_type == "income" and txn.account_id:
         acct = db.query(Account).filter(Account.id == txn.account_id).first()
         if acct:
-            acct.current_balance = float(
-                to_decimal(acct.current_balance) - amount
-            )
+            acct.current_balance = money(to_decimal(acct.current_balance) - amount)
 
     elif txn.transaction_type == "expense" and txn.account_id:
         acct = db.query(Account).filter(Account.id == txn.account_id).first()
         if acct:
-            acct.current_balance = float(
-                to_decimal(acct.current_balance) + amount
-            )
+            acct.current_balance = money(to_decimal(acct.current_balance) + amount)
 
     elif txn.transaction_type == "transfer":
         # Restore account balance
         if txn.account_id:
             acct = db.query(Account).filter(Account.id == txn.account_id).first()
             if acct:
-                acct.current_balance = float(
+                acct.current_balance = money(
                     to_decimal(acct.current_balance) + amount
                 )
         # Restore loan outstanding
         if txn.loan_id:
             loan = db.query(Loan).filter(Loan.id == txn.loan_id).first()
             if loan:
-                loan.outstanding_balance = float(
+                loan.outstanding_balance = money(
                     to_decimal(loan.outstanding_balance) + amount
                 )
         # CC: no reversal needed — derived from ledger (this row disappears)

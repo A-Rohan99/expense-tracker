@@ -18,6 +18,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.models import Account, RecurringIncome, Transaction
+from app.money import money
 from app.services.finance import clamp_day, shift_month
 
 # A standing instruction set up long ago shouldn't flood the ledger on first
@@ -118,7 +119,7 @@ def run_catch_up(
         txn = Transaction(
             user_id=income.user_id,
             transaction_type="income",
-            amount=float(amount),
+            amount=money(amount),
             currency=income.currency,
             transaction_date=due_date_for(period, income.day_of_month),
             category=income.category,
@@ -127,7 +128,7 @@ def run_catch_up(
             account_id=income.account_id,
         )
         db.add(txn)
-        account.current_balance = float(
+        account.current_balance = money(
             Decimal(str(account.current_balance)) + amount
         )
         income.last_posted_period = period_key(period)

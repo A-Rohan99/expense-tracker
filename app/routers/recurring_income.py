@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_active_user
 from app.db import get_db
 from app.models import Account, RecurringIncome, User
+from app.routers import money
 from app.schemas import (
     RecurringIncomeCreate,
     RecurringIncomeRead,
@@ -108,7 +109,7 @@ def create_recurring_income(
         user_id=user.id,
         account_id=body.account_id,
         name=body.name,
-        amount=float(body.amount),
+        amount=money(body.amount),
         day_of_month=body.day_of_month,
         category=body.category,
         currency=body.currency,
@@ -142,7 +143,7 @@ def update_recurring_income(
     if "account_id" in data and data["account_id"] is not None:
         _own_account_or_404(db, user, data["account_id"])
     if "amount" in data and data["amount"] is not None:
-        data["amount"] = float(data["amount"])
+        data["amount"] = money(data["amount"])
 
     for field, value in data.items():
         setattr(income, field, value)

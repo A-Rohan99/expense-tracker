@@ -25,12 +25,18 @@ Design notes
 
 All monetary columns use ``Numeric(14, 2)`` — a fixed-point type that avoids
 floating-point drift and maps cleanly to both SQLite REAL and Postgres NUMERIC.
+They are annotated ``Mapped[Decimal]``: SQLAlchemy hands back ``Decimal`` for
+these columns, and writes must pass ``Decimal`` too.  Never cast a monetary
+value to ``float`` — Postgres rounds on write where SQLite does not, so a float
+round-trip makes the same inputs produce different balances on the two
+backends.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -163,7 +169,7 @@ class Account(Base):
     account_type: Mapped[str] = mapped_column(
         String(30), nullable=False, default="bank",
     )  # bank | cash | wallet
-    current_balance: Mapped[float] = mapped_column(
+    current_balance: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, default=0,
     )
     currency: Mapped[str] = mapped_column(
@@ -216,7 +222,7 @@ class CreditCard(Base):
     last_four: Mapped[str | None] = mapped_column(
         String(4), nullable=True,
     )  # optional card identifier
-    total_limit: Mapped[float] = mapped_column(
+    total_limit: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False,
     )
     statement_day: Mapped[int] = mapped_column(
@@ -282,16 +288,16 @@ class Loan(Base):
     loan_type: Mapped[str] = mapped_column(
         String(30), nullable=False, default="personal",
     )  # personal | home | auto | education | other
-    principal_amount: Mapped[float] = mapped_column(
+    principal_amount: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False,
     )
-    interest_rate: Mapped[float] = mapped_column(
+    interest_rate: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False,
     )  # annual % e.g. 8.50
     tenure_months: Mapped[int] = mapped_column(
         Integer, nullable=False,
     )
-    outstanding_balance: Mapped[float] = mapped_column(
+    outstanding_balance: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False,
     )
     start_date: Mapped[date] = mapped_column(
@@ -367,7 +373,7 @@ class Transaction(Base):
     transaction_type: Mapped[str] = mapped_column(
         String(10), nullable=False,
     )  # income | expense | transfer
-    amount: Mapped[float] = mapped_column(
+    amount: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False,
     )  # always positive
     currency: Mapped[str] = mapped_column(
@@ -481,7 +487,7 @@ class RecurringIncome(Base):
     name: Mapped[str] = mapped_column(
         String(120), nullable=False, default="Monthly income",
     )
-    amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     # 1–31.  Months shorter than the chosen day clamp to the last day.
     day_of_month: Mapped[int] = mapped_column(Integer, nullable=False)
     category: Mapped[str] = mapped_column(

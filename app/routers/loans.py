@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_active_user
 from app.db import get_db
 from app.models import Account, Loan, Transaction, User
-from app.routers import get_or_404, to_decimal
+from app.routers import get_or_404, money, to_decimal
 from app.schemas import (
     AmortisationRow,
     EMICalculationRequest,
@@ -167,8 +167,10 @@ def pay_emi(
     If the outstanding balance is less than a full EMI, only the remaining
     amount is charged (final instalment adjustment).
     """
-    loan = get_or_404(db, Loan, loan_id, user_id=user.id)
-    account = get_or_404(db, Account, body.account_id, user_id=user.id)
+    loan = get_or_404(db, Loan, loan_id, user_id=user.id, for_update=True)
+    account = get_or_404(
+        db, Account, body.account_id, user_id=user.id, for_update=True
+    )
 
     outstanding = to_decimal(loan.outstanding_balance)
     if outstanding <= 0:
@@ -203,13 +205,13 @@ def pay_emi(
         )
 
     # ── Atomically update balances + create transaction ────────────────
-    account.current_balance = float(account_balance - actual_deduction)
-    loan.outstanding_balance = float(breakdown["new_outstanding"])
+    account.current_balance = money(account_balance - actual_deduction)
+    loan.outstanding_balance = money(breakdown["new_outstanding"])
 
     txn = Transaction(
         user_id=user.id,
         transaction_type="transfer",
-        amount=float(actual_deduction),
+        amount=money(actual_deduction),
         currency=loan.currency,
         transaction_date=date.today(),
         category="EMI Payment",
