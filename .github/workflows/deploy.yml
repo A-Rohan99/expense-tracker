@@ -78,6 +78,19 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Write release keystore
+        # A stable signing key so a new APK installs as an update on phones
+        # that already have a previous build, instead of Android refusing
+        # it as a signature mismatch (see build.gradle.kts).
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/release.keystore
+          cat > android/key.properties <<EOF
+          storeFile=release.keystore
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
       - name: Build APK
         run: |
           flutter build apk --release \
