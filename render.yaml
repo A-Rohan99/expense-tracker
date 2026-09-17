@@ -1,14 +1,10 @@
-# Render Blueprint — one-click backend + Postgres.
+# Render Blueprint — backend only. The database lives on Neon, not here:
+# Render's own free Postgres self-deletes 30 days after creation (44 with
+# the grace period), which makes it a bad fit for anything meant to hold
+# real data long-term. Neon's free tier has no such expiry.
 #
-# In the Render dashboard: New -> Blueprint -> pick this repo. Render reads
-# this file, provisions the database, and deploys the API. Every push to
+# In the Render dashboard: New -> Blueprint -> pick this repo. Every push to
 # main after that redeploys automatically; no extra CI step needed.
-databases:
-  - name: expense-tracker-db
-    plan: free
-    databaseName: expense_tracker
-    user: expense_tracker
-
 services:
   - type: web
     name: expense-tracker-api
@@ -22,8 +18,10 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: expense-tracker-db
-          property: connectionString
+        # Set manually in the Render dashboard to your Neon connection
+        # string — not tracked here since this repo is public and this
+        # value is a credential. `sync: false` stops the blueprint from
+        # ever trying to overwrite whatever's set in the dashboard.
+        sync: false
       - key: ALLOWED_ORIGINS
         value: "https://a-rohan99.github.io"
