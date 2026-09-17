@@ -26,6 +26,4 @@ services:
           name: expense-tracker-db
           property: connectionString
       - key: ALLOWED_ORIGINS
-        # Update after the GitHub Pages URL exists, e.g.
-        # https://<you>.github.io
-        value: "https://localhost:5000"
+        value: "https://a-rohan99.github.io"
