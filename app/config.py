@@ -57,6 +57,13 @@ if IS_PRODUCTION:
 else:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./expense_tracker.db")
 
+# Managed hosts (Render, Railway, Fly) hand out a plain "postgresql://" URL.
+# SQLAlchemy resolves that to psycopg2, which isn't installed — only psycopg
+# (v3) is. Force the driver explicitly rather than requiring every hosting
+# platform's default string to be hand-edited.
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
 # Connection pool (Postgres only — SQLite has no meaningful pool).
 DB_POOL_SIZE: int = _int_env("DB_POOL_SIZE", 5)
 DB_MAX_OVERFLOW: int = _int_env("DB_MAX_OVERFLOW", 10)

@@ -32,11 +32,12 @@ Generate the key with:
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
-Then create the schema and start the API:
+Then create the schema and start the API. `uvicorn` does not load `.env` on its
+own, so either export the variables first or pass `--env-file`:
 
 ```bash
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --env-file .env
 ```
 
 The API is on http://localhost:8000, with docs at `/docs` (development only).

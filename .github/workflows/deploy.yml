@@ -1,0 +1,92 @@
+# Builds and publishes the client on every push to main:
+#   - Flutter web -> GitHub Pages (the PWA, "Add to Home Screen")
+#   - Flutter APK -> attached to a new GitHub Release (sideload on Android)
+#
+# The backend is NOT deployed from here — Render watches this repo directly
+# once connected via the render.yaml blueprint, and redeploys on its own.
+#
+# Needs one repository variable set first (Settings -> Secrets and variables
+# -> Actions -> Variables): API_BASE_URL, e.g.
+#   https://expense-tracker-api.onrender.com/api/v1
+name: Deploy client
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-client
+  cancel-in-progress: false
+
+jobs:
+  web:
+    name: Web -> GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build web
+        run: |
+          flutter build web --release \
+            --base-href /${{ github.event.repository.name }}/ \
+            --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/build/web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  apk:
+    name: Android APK -> GitHub Release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - run: flutter pub get
+
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          files: frontend/build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true

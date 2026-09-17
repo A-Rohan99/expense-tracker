@@ -139,7 +139,7 @@ def create_loan(
     db.add(loan)
     db.commit()
     db.refresh(loan)
-    return loan
+    return _attach_emi_state(db, [loan])[0]
 
 
 @router.get("/{loan_id}", response_model=LoanRead)

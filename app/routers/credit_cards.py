@@ -139,7 +139,7 @@ def create_credit_card(
     db.add(card)
     db.commit()
     db.refresh(card)
-    return card
+    return _attach_derived_amounts(db, [card])[0]
 
 
 @router.get("/{card_id}", response_model=CreditCardRead)
